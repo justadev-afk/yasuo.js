@@ -19,7 +19,7 @@ jobs:
     name: Typecheck · Lint · Unit · Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -48,7 +48,7 @@ jobs:
     env:
       RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
