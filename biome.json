@@ -1,0 +1,77 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "ignore": ["dist", "node_modules", "coverage", "*.min.js"]
+  },
+  "organizeImports": {
+    "enabled": true
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100,
+    "lineEnding": "lf"
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "jsxQuoteStyle": "double",
+      "semicolons": "asNeeded",
+      "trailingCommas": "all",
+      "arrowParentheses": "always",
+      "bracketSpacing": true,
+      "quoteProperties": "asNeeded"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "complexity": {
+        "useLiteralKeys": "error",
+        "noForEach": "off",
+        "noExcessiveCognitiveComplexity": "off",
+        "noUselessConstructor": "error"
+      },
+      "correctness": {
+        "noUnusedVariables": "error",
+        "noUnusedImports": "error",
+        "noUnusedFunctionParameters": "error",
+        "noUndeclaredVariables": "error"
+      },
+      "style": {
+        "useConst": "error",
+        "useTemplate": "error",
+        "useEnumInitializers": "error",
+        "noParameterAssign": "error",
+        "useShorthandArrayType": "error",
+        "useNodejsImportProtocol": "error",
+        "useImportType": "error",
+        "useExportType": "error",
+        "useConsistentArrayType": { "level": "error", "options": { "syntax": "shorthand" } },
+        "noNonNullAssertion": "warn",
+        "noNamespace": "off",
+        "useNamingConvention": "off",
+        "useDefaultParameterLast": "error",
+        "useCollapsedElseIf": "error"
+      },
+      "suspicious": {
+        "noExplicitAny": "error",
+        "noConsoleLog": "off",
+        "noAssignInExpressions": "error",
+        "noEmptyInterface": "off",
+        "noUnsafeDeclarationMerging": "off",
+        "useAwait": "off"
+      },
+      "nursery": {
+        "useConsistentMemberAccessibility": "off"
+      }
+    }
+  }
+}

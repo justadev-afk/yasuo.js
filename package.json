@@ -1,0 +1,72 @@
+{
+  "name": "yasuo",
+  "version": "0.1.0",
+  "description": "The modern, fully-typed, zero-dependency Riot Games API client for TypeScript. The evolution of Twisted, with a proactive rate limiter, lazy relations and async pagination.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "sideEffects": false,
+  "engines": {
+    "bun": ">=1.0.0",
+    "node": ">=18.0.0"
+  },
+  "packageManager": "bun@1.3.14",
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "test": "bun test test/unit",
+    "test:unit": "bun test test/unit",
+    "test:integration": "bun test test/integration",
+    "test:all": "bun test",
+    "check": "bun run typecheck && bun run lint && bun run test:unit",
+    "prepublishOnly": "bun run build"
+  },
+  "keywords": [
+    "riot",
+    "riot-games",
+    "riot-api",
+    "league-of-legends",
+    "lol",
+    "tft",
+    "teamfight-tactics",
+    "api",
+    "wrapper",
+    "client",
+    "sdk",
+    "typescript",
+    "rate-limiter",
+    "twisted"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/justadev-afk/yasuo.git"
+  },
+  "homepage": "https://github.com/justadev-afk/yasuo#readme",
+  "bugs": {
+    "url": "https://github.com/justadev-afk/yasuo/issues"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/bun": "latest",
+    "tsup": "^8.3.5",
+    "typescript": "^5.6.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "trustedDependencies": ["@biomejs/biome"]
+}
