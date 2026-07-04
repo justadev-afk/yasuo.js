@@ -9,6 +9,8 @@ import {
   ApiError,
   Division,
   type HttpMiddleware,
+  KVCache,
+  type KVNamespaceLike,
   LogLevel,
   MatchType,
   NotFoundError,
@@ -133,6 +135,16 @@ function withRedis(redis: RedisClientLike): Yasuo {
   return new Yasuo({ key: 'RGAPI-x', cache: { store: new RedisCache(redis), ttlMs: 30_000 } })
 }
 
+// --- Caching on Cloudflare Workers with a KV namespace binding ----------------
+
+function withCloudflareKV(kv: KVNamespaceLike): Yasuo {
+  // Explicit wrapper, or pass the raw binding as `store` and let yasuo wrap it.
+  const explicit = new Yasuo({ key: 'RGAPI-x', cache: { store: new KVCache(kv), ttlMs: 300_000 } })
+  const raw = new Yasuo({ key: 'RGAPI-x', cache: { store: kv } }) // auto-wrapped in KVCache
+  void raw
+  return explicit
+}
+
 // --- Custom HTTP client + stackable middleware (axios-style) ------------------
 
 function withMiddleware(): Yasuo {
@@ -175,6 +187,7 @@ export {
   tft,
   staticData,
   withRedis,
+  withCloudflareKV,
   withMiddleware,
   safeLookup,
 }

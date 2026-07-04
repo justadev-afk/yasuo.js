@@ -37,7 +37,7 @@ const yasuo = new Yasuo({
 | Field     | Type         | Default                | Description                                                        |
 | --------- | ------------ | ---------------------- | ------------------------------------------------------------------ |
 | `enabled` | `boolean`    | `true` when an object is given | Master switch. Set `false` to disable without removing the config. |
-| `store`   | `CacheStore` | a new `MemoryCache`    | Backing store. Swap in `RedisCache` or your own implementation.    |
+| `store`   | `CacheStoreLike` | a new `MemoryCache` | Backing store: a `CacheStore`, or a raw Redis client / Cloudflare KV namespace (auto-wrapped in `RedisCache`/`KVCache`). |
 | `ttlMs`   | `number`     | `60000` (60s)          | Time-to-live per entry, in milliseconds.                           |
 
 Shorthand mapping:
@@ -120,6 +120,45 @@ new RedisCache(redis, { keyPrefix: 'myapp:riot:' })
 ```
 
 Note that `RedisCache.clear()` intentionally throws — flushing a shared Redis instance is too dangerous to do implicitly. Delete specific keys or flush the database out-of-band instead.
+
+## Cloudflare KV
+
+Running on Cloudflare Workers? `KVCache` wraps a **KV namespace binding** the same way `RedisCache` wraps a Redis client — so a cache is shared across every isolate and edge location, again with **no dependency**: yasuo needs only the three methods (`get`, `put`, `delete`) that the real binding already exposes.
+
+```ts
+import { Yasuo, KVCache } from 'yasuo'
+
+// `env.RIOT_CACHE` is a KV namespace binding declared in wrangler.toml.
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const yasuo = new Yasuo({
+      key: env.RIOT_API_KEY,
+      cache: { store: new KVCache(env.RIOT_CACHE), ttlMs: 300_000 },
+    })
+
+    const summoner = await yasuo.lol.summoner.byPuuid(puuid, Region.KR).execute()
+    return Response.json({ level: summoner.summonerLevel })
+  },
+}
+```
+
+A couple of KV-specific things to know:
+
+- **Minimum TTL is 60 seconds.** Cloudflare rejects an `expirationTtl` below 60, so `KVCache` clamps any sub-minute `ttlMs` up to 60s. Pick `ttlMs >= 60_000` to get exactly what you ask for.
+- **`clear()` is unsupported** (it throws), for the same reason as Redis — KV has no atomic flush. Delete specific keys out-of-band.
+- **`keyPrefix`** works just like Redis (default `yasuo:`): `new KVCache(env.RIOT_CACHE, { keyPrefix: 'myapp:' })`.
+
+### Passing a raw client — `RedisClientLike` or `KVNamespaceLike`
+
+You don't have to construct the wrapper yourself. The `store` option accepts a **raw** Redis client or KV namespace and yasuo wraps it for you — it detects a KV namespace by its `put` method and a Redis client by its `del` method:
+
+```ts
+// Both of these are equivalent to wrapping by hand:
+new Yasuo({ key, cache: { store: env.RIOT_CACHE } })   // -> KVCache
+new Yasuo({ key, cache: { store: redis } })            // -> RedisCache
+```
+
+Anything that already implements the full `CacheStore` interface (below) is used as-is.
 
 ## Custom stores
 

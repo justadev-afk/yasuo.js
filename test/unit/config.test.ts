@@ -6,7 +6,9 @@ import {
   resolveRateLimiterOptions,
   resolveRetryOptions,
 } from '../../src/client/config'
+import { KVCache } from '../../src/core/cache/kv-cache'
 import { MemoryCache } from '../../src/core/cache/memory-cache'
+import { RedisCache } from '../../src/core/cache/redis-cache'
 import { LogLevel, noopLogger } from '../../src/core/logger'
 import { DEFAULT_BASE_URL } from '../../src/endpoints/endpoint'
 
@@ -75,6 +77,24 @@ describe('resolveCacheOptions', () => {
     const resolved = resolveCacheOptions({ enabled: false, ttlMs: 5000 })
     expect(resolved.store).toBeNull()
     expect(resolved.ttlMs).toBe(5000)
+  })
+
+  test('wraps a raw Cloudflare KV namespace in a KVCache', () => {
+    const kv = {
+      get: () => Promise.resolve(null),
+      put: () => Promise.resolve(),
+      delete: () => Promise.resolve(),
+    }
+    expect(resolveCacheOptions({ store: kv }).store).toBeInstanceOf(KVCache)
+  })
+
+  test('wraps a raw Redis client in a RedisCache', () => {
+    const redis = {
+      get: () => Promise.resolve(null),
+      set: () => Promise.resolve('OK'),
+      del: () => Promise.resolve(1),
+    }
+    expect(resolveCacheOptions({ store: redis }).store).toBeInstanceOf(RedisCache)
   })
 })
 

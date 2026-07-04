@@ -1,4 +1,4 @@
-import { type CacheStore, MemoryCache } from '../core/cache'
+import { type CacheStore, type CacheStoreLike, MemoryCache, coerceCacheStore } from '../core/cache'
 import type { HttpClient } from '../core/http/http-client'
 import type { HttpMiddleware } from '../core/http/middleware'
 import { type LogLevel, type Logger, createConsoleLogger, resolveLogLevel } from '../core/logger'
@@ -31,8 +31,12 @@ export interface RetryOptions {
 export interface CacheOptions {
   /** Whether caching is on. Default `true` when a {@link CacheOptions} object is given. */
   enabled?: boolean
-  /** Backing store. Defaults to an in-memory {@link MemoryCache}. */
-  store?: CacheStore
+  /**
+   * Backing store. Defaults to an in-memory {@link MemoryCache}. Pass a full
+   * {@link CacheStore}, or a raw client and yasuo wraps it: a Redis-compatible
+   * client (→ {@link RedisCache}) or a Cloudflare KV namespace (→ {@link KVCache}).
+   */
+  store?: CacheStoreLike
   /** Time-to-live in milliseconds. Default `60000` (60s). */
   ttlMs?: number
 }
@@ -173,7 +177,7 @@ export function resolveCacheOptions(cache: YasuoConfig['cache']): ResolvedCacheO
     return { store: null, ttlMs: cache.ttlMs ?? DEFAULT_CACHE_TTL_MS }
   }
   return {
-    store: cache.store ?? new MemoryCache(),
+    store: cache.store ? coerceCacheStore(cache.store) : new MemoryCache(),
     ttlMs: cache.ttlMs ?? DEFAULT_CACHE_TTL_MS,
   }
 }

@@ -1,0 +1,64 @@
+/*
+ * yasuo — monochrome (black / gray) theme overrides.
+ * Replaces Material's default teal accent and blue-tinted slate with a neutral
+ * black-and-gray palette, in both light and dark mode.
+ */
+
+/* ---- Light mode: black header, gray accent ---------------------------- */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #111111;
+  --md-primary-fg-color--light: #2a2a2a;
+  --md-primary-fg-color--dark: #000000;
+  --md-accent-fg-color: #4a4a4a;
+  --md-typeset-a-color: #1f1f1f;
+}
+
+/* ---- Dark mode: near-black background, neutral (un-blued) gray -------- */
+[data-md-color-scheme="slate"] {
+  --md-hue: 0; /* strip Material's blue tint from slate → neutral gray */
+
+  --md-primary-fg-color: #0d0d0d;
+  --md-primary-fg-color--light: #1c1c1c;
+  --md-primary-fg-color--dark: #000000;
+  --md-accent-fg-color: #cfcfcf;
+
+  --md-default-bg-color: hsla(0, 0%, 7%, 1);
+  --md-default-bg-color--light: hsla(0, 0%, 7%, 0.7);
+  --md-default-bg-color--lighter: hsla(0, 0%, 7%, 0.3);
+  --md-default-bg-color--lightest: hsla(0, 0%, 7%, 0.12);
+
+  --md-code-bg-color: hsla(0, 0%, 12%, 1);
+  --md-code-fg-color: #e6e6e6;
+
+  --md-typeset-a-color: #c7c7c7;
+}
+
+/* Links: gray, underline on hover — readable without the teal. */
+.md-typeset a {
+  text-decoration: none;
+}
+.md-typeset a:hover {
+  text-decoration: underline;
+}
+
+/* Code blocks: a hair of definition so they read as panels, not paragraphs. */
+.md-typeset pre > code {
+  border-radius: 6px;
+}
+[data-md-color-scheme="slate"] .md-typeset pre > code {
+  border: 1px solid hsla(0, 0%, 100%, 0.06);
+}
+[data-md-color-scheme="default"] .md-typeset pre > code {
+  border: 1px solid hsla(0, 0%, 0%, 0.08);
+}
+
+/* Inline code: subtle gray chip. */
+.md-typeset code {
+  border-radius: 4px;
+}
+
+/* Keep the header/footer a solid near-black in both schemes. */
+.md-header,
+.md-footer {
+  background-color: #0d0d0d;
+}

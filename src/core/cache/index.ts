@@ -1,3 +1,5 @@
 export type { CachedResult, CacheStore } from './cache-store'
+export { type CacheStoreLike, coerceCacheStore } from './coerce-store'
+export { KVCache, type KVCacheOptions, type KVNamespaceLike } from './kv-cache'
 export { MemoryCache, type MemoryCacheOptions } from './memory-cache'
 export { RedisCache, type RedisCacheOptions, type RedisClientLike } from './redis-cache'

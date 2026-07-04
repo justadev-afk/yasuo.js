@@ -42,6 +42,11 @@ export { RateLimiter, type RateLimiterOptions } from './core/rate-limit/rate-lim
 export {
   type CachedResult,
   type CacheStore,
+  type CacheStoreLike,
+  coerceCacheStore,
+  KVCache,
+  type KVCacheOptions,
+  type KVNamespaceLike,
   MemoryCache,
   type MemoryCacheOptions,
   RedisCache,

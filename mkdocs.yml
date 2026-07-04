@@ -14,29 +14,27 @@ copyright: Copyright &copy; justadev-afk — MIT licensed
 theme:
   name: material
   language: en
+  custom_dir: overrides
   icon:
     repo: fontawesome/brands/github
     logo: material/sword-cross
   favicon: https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/2694.png
   palette:
-    - media: "(prefers-color-scheme)"
+    # Dark (near-black + gray) is the default; toggle to light.
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: grey
       toggle:
-        icon: material/brightness-auto
+        icon: material/weather-night
         name: Switch to light mode
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: teal
-      accent: teal
+      primary: black
+      accent: grey
       toggle:
         icon: material/weather-sunny
         name: Switch to dark mode
-    - media: "(prefers-color-scheme: dark)"
-      scheme: slate
-      primary: teal
-      accent: teal
-      toggle:
-        icon: material/weather-night
-        name: Switch to system preference
   features:
     - navigation.instant
     - navigation.tracking
@@ -61,9 +59,28 @@ nav:
       - Logging: logging.md
       - Pagination: pagination.md
       - Errors: errors.md
-  - Reference:
+  - API reference:
+      - Overview: api/index.md
+      - League of Legends:
+          - Summoner: api/lol-summoner.md
+          - League: api/lol-league.md
+          - Champion Mastery: api/lol-champion-mastery.md
+          - Champion Rotation: api/lol-champion.md
+          - Match: api/lol-match.md
+          - Spectator: api/lol-spectator.md
+          - Status: api/lol-status.md
+          - Clash: api/lol-clash.md
+          - Challenges: api/lol-challenges.md
+      - Teamfight Tactics:
+          - Summoner: api/tft-summoner.md
+          - League: api/tft-league.md
+          - Match: api/tft-match.md
+          - Spectator: api/tft-spectator.md
+      - Riot & static:
+          - Account: api/riot-account.md
+          - Data Dragon: api/data-dragon.md
       - Endpoint coverage: endpoints.md
-      - Architecture: architecture.md
+  - Architecture: architecture.md
   - Migrating from twisted: migrating-from-twisted.md
 
 markdown_extensions:
@@ -88,6 +105,9 @@ markdown_extensions:
 
 plugins:
   - search
+
+extra_css:
+  - stylesheets/extra.css
 
 extra:
   social:

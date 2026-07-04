@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+<!--
+  Custom browser-tab title. Instead of a bare "yasuo", show a descriptive title
+  on the home page and "<Page> · yasuo · Riot Games API client" elsewhere, so
+  the tab always says which page you're on.
+-->
+{% block htmltitle %}
+  {% if page and page.is_homepage %}
+    <title>yasuo · TypeScript client for the Riot Games API</title>
+  {% elif page and page.title %}
+    <title>{{ page.title | striptags }} · yasuo · Riot Games API client</title>
+  {% else %}
+    <title>{{ config.site_name }}</title>
+  {% endif %}
+{% endblock %}
