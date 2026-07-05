@@ -1,12 +1,12 @@
 name: CI
 
+# Tests, lint, typecheck and build run on pull requests only. Pushes to `main`
+# run just the docs (docs.yml) and publish (publish.yml) workflows.
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
-# Cancel superseded runs on the same ref.
+# Cancel superseded runs on the same PR.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -15,6 +15,36 @@ permissions:
   contents: read
 
 jobs:
+  version:
+    name: Version ahead of npm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      # The published version can't be overwritten, so a PR must raise the
+      # version above what's on npm — otherwise the publish on merge would
+      # silently skip (or conflict). Fails the PR until `package.json` is bumped.
+      - name: Assert package.json version is greater than npm
+        run: |
+          PKG_NAME="$(node -p "require('./package.json').name")"
+          PKG_LOCAL="$(node -p "require('./package.json').version")"
+          PKG_REMOTE="$(npm view "$PKG_NAME" version 2>/dev/null || echo '0.0.0')"
+          echo "local=$PKG_LOCAL  npm=$PKG_REMOTE"
+          PKG_LOCAL="$PKG_LOCAL" PKG_REMOTE="$PKG_REMOTE" bun -e '
+            const local = process.env.PKG_LOCAL
+            const remote = process.env.PKG_REMOTE
+            if (Bun.semver.order(local, remote) !== 1) {
+              console.error(`::error::package.json version ${local} must be greater than the published npm version ${remote} — bump it before merging.`)
+              process.exit(1)
+            }
+            console.log(`version ${local} > npm ${remote} ✓`)
+          '
+
   check:
     name: Typecheck · Lint · Unit · Build
     runs-on: ubuntu-latest
