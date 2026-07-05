@@ -154,7 +154,7 @@ The docs are part of the public API, not an afterthought. **Whenever the public 
 
 - Every code block in `docs/` must compile against the current API: query builder + terminal `.execute()` resolving the entity/`Collection`/`ValueResult` **directly** (read `.error`/`.http`, and `.value` for scalars), the `{ throw: true }`/`{ raw: true }` opt-ins — no `YasuoResponse`, no `.unwrap()`, no thenable `await ref`.
 - `examples/basic-usage.ts` is the executable smoke-test for the docs — keep it in lock-step with the prose.
-- The docs are published with **MkDocs Material** to GitHub Pages at **<https://justadev-afk.github.io/yasuo.js/>**, which is the **canonical reference**. Keep internal cross-links as bare relative `.md` links (e.g. `[errors](errors.md)`) so MkDocs resolves them.
+- The docs are published with **MkDocs Material** to GitHub Pages at **<https://docs.yasuo.gg/>**, which is the **canonical reference**. Keep internal cross-links as bare relative `.md` links (e.g. `[errors](errors.md)`) so MkDocs resolves them.
 
 ## Definition of done for a change
 

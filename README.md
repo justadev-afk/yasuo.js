@@ -29,7 +29,7 @@ console.log(matches.error)        // null on success, the ApiError on failure
 console.log(matches.http.rateLimits.app)  // rate-limit budget travels with every result
 ```
 
-📚 **Full documentation: <https://justadev-afk.github.io/yasuo.js/>**
+📚 **Full documentation: <https://docs.yasuo.gg/>**
 
 ---
 
@@ -177,7 +177,7 @@ const yasuo = new Yasuo({
 })
 ```
 
-See [the rate-limiting guide](https://justadev-afk.github.io/yasuo.js/rate-limiting/).
+See [the rate-limiting guide](https://docs.yasuo.gg/rate-limiting/).
 
 ## Caching
 
@@ -195,7 +195,7 @@ const y4    = new Yasuo({ key, cache: { store: redis } })
 const y5    = new Yasuo({ key, cache: { store: env.RIOT_CACHE } })
 ```
 
-See [the caching guide](https://justadev-afk.github.io/yasuo.js/caching/).
+See [the caching guide](https://docs.yasuo.gg/caching/).
 
 ## Custom transport & middleware
 
@@ -218,7 +218,7 @@ yasuo.use((request, next) => next({ ...request, headers: { ...request.headers, '
 yasuo.lol.match.use((request, next) => { console.debug('match', request.url); return next(request) })
 ```
 
-See [the transport & middleware guide](https://justadev-afk.github.io/yasuo.js/http-and-middleware/).
+See [the transport & middleware guide](https://docs.yasuo.gg/http-and-middleware/).
 
 ## Logging
 
@@ -230,7 +230,7 @@ import { Yasuo, LogLevel } from 'yasuo.js'
 const yasuo = new Yasuo({ key, logLevel: LogLevel.DEBUG })  // or set YASUO_LOG_LEVEL=debug
 ```
 
-See [the logging guide](https://justadev-afk.github.io/yasuo.js/logging/).
+See [the logging guide](https://docs.yasuo.gg/logging/).
 
 ## Pagination & async iterators
 
@@ -245,7 +245,7 @@ for await (const id of yasuo.lol.match.streamIds(puuid, RegionGroup.ASIA, { star
 const firstFifty = await yasuo.lol.match.streamIds(puuid, RegionGroup.ASIA).toArray(50)
 ```
 
-See [the pagination guide](https://justadev-afk.github.io/yasuo.js/pagination/).
+See [the pagination guide](https://docs.yasuo.gg/pagination/).
 
 ## Error handling
 
@@ -263,7 +263,7 @@ else                                               { console.log(summoner.summon
 
 Prefer exceptions? `.execute({ throw: true })` throws that same `ApiError` instead of attaching it. Misuse (a missing/invalid key) always throws, regardless.
 
-See [the error-handling guide](https://justadev-afk.github.io/yasuo.js/errors/).
+See [the error-handling guide](https://docs.yasuo.gg/errors/).
 
 ## API coverage
 
@@ -274,27 +274,27 @@ See [the error-handling guide](https://justadev-afk.github.io/yasuo.js/errors/).
 - **Riot** (4): Account (by PUUID / by Riot ID) · Active Shard · Active Region
 - **Data Dragon**: versions, champions, runes, static reference data
 
-See [the endpoint map](https://justadev-afk.github.io/yasuo.js/endpoints/) for the full list.
+See [the endpoint map](https://docs.yasuo.gg/endpoints/) for the full list.
 
 ## Documentation
 
-Full docs live at **<https://justadev-afk.github.io/yasuo.js/>**:
+Full docs live at **<https://docs.yasuo.gg/>**:
 
-- [Getting started](https://justadev-afk.github.io/yasuo.js/getting-started/)
-- [Architecture & contribution rules](https://justadev-afk.github.io/yasuo.js/architecture/)
-- [Entities & lazy relations](https://justadev-afk.github.io/yasuo.js/entities-and-relations/)
-- [Rate limiting](https://justadev-afk.github.io/yasuo.js/rate-limiting/)
-- [Caching](https://justadev-afk.github.io/yasuo.js/caching/)
-- [Logging](https://justadev-afk.github.io/yasuo.js/logging/)
-- [Transport & middleware](https://justadev-afk.github.io/yasuo.js/http-and-middleware/)
-- [Pagination](https://justadev-afk.github.io/yasuo.js/pagination/)
-- [Errors](https://justadev-afk.github.io/yasuo.js/errors/)
-- [Endpoint coverage](https://justadev-afk.github.io/yasuo.js/endpoints/)
-- [Migrating from twisted](https://justadev-afk.github.io/yasuo.js/migrating-from-twisted/)
+- [Getting started](https://docs.yasuo.gg/getting-started/)
+- [Architecture & contribution rules](https://docs.yasuo.gg/architecture/)
+- [Entities & lazy relations](https://docs.yasuo.gg/entities-and-relations/)
+- [Rate limiting](https://docs.yasuo.gg/rate-limiting/)
+- [Caching](https://docs.yasuo.gg/caching/)
+- [Logging](https://docs.yasuo.gg/logging/)
+- [Transport & middleware](https://docs.yasuo.gg/http-and-middleware/)
+- [Pagination](https://docs.yasuo.gg/pagination/)
+- [Errors](https://docs.yasuo.gg/errors/)
+- [Endpoint coverage](https://docs.yasuo.gg/endpoints/)
+- [Migrating from twisted](https://docs.yasuo.gg/migrating-from-twisted/)
 
 ## Migrating from twisted
 
-yasuo is a spiritual successor, not a drop-in replacement — the ergonomics are better. The short version: constructor takes a config object, `LolApi`/`TftApi`/`RiotApi` become `yasuo.lol`/`yasuo.tft`/`yasuo.riot`, the `{ response, rateLimits }` envelope becomes the **entity itself** (carrying `.error`/`.http`) that you run with `.execute()`, and encrypted-summoner-id lookups give way to PUUIDs. Full mapping in [the migration guide](https://justadev-afk.github.io/yasuo.js/migrating-from-twisted/).
+yasuo is a spiritual successor, not a drop-in replacement — the ergonomics are better. The short version: constructor takes a config object, `LolApi`/`TftApi`/`RiotApi` become `yasuo.lol`/`yasuo.tft`/`yasuo.riot`, the `{ response, rateLimits }` envelope becomes the **entity itself** (carrying `.error`/`.http`) that you run with `.execute()`, and encrypted-summoner-id lookups give way to PUUIDs. Full mapping in [the migration guide](https://docs.yasuo.gg/migrating-from-twisted/).
 
 ## Development
 
@@ -308,7 +308,7 @@ bun run build         # single-file ESM + CJS + d.ts
 bun run docs:serve    # preview the MkDocs site locally
 ```
 
-Unit tests run network-free (inject `MockHttpClient` or a fake `HttpClient`/`fetch`) and are **coverage-gated at 95% line/statement** coverage (currently ~97.5%) via `bunfig.toml`. Conventions for contributors (folder layout, one-declaration-per-file, enum rules) live in [the architecture guide](https://justadev-afk.github.io/yasuo.js/architecture/).
+Unit tests run network-free (inject `MockHttpClient` or a fake `HttpClient`/`fetch`) and are **coverage-gated at 95% line/statement** coverage (currently ~97.5%) via `bunfig.toml`. Conventions for contributors (folder layout, one-declaration-per-file, enum rules) live in [the architecture guide](https://docs.yasuo.gg/architecture/).
 
 ## License
 

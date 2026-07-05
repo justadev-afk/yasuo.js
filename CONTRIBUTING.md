@@ -56,7 +56,7 @@ These are enforced in review (and mostly by `biome`/`tsc`):
   `src/index.ts`.
 - **Keep the docs alive.** Any change to the public API must update the guides
   under `docs/` and, where relevant, `examples/basic-usage.ts`, in the *same* PR.
-  The published site at <https://justadev-afk.github.io/yasuo.js/> is the canonical
+  The published site at <https://docs.yasuo.gg/> is the canonical
   reference. See [the architecture guide](docs/architecture.md).
 
 More detail on layout and conventions lives in

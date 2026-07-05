@@ -2,7 +2,7 @@ site_name: Yasuo
 site_description: >-
   The modern, zero-dependency TypeScript client for the Riot Games API —
   League of Legends, Teamfight Tactics and the Riot Account API.
-site_url: https://justadev-afk.github.io/yasuo.js/
+site_url: https://docs.yasuo.gg/
 site_author: justadev-afk
 
 repo_name: justadev-afk/yasuo.js
