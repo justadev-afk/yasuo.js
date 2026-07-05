@@ -1,0 +1,548 @@
+# yasuo
+
+> yasuo is a modern, fully-typed, **zero-runtime-dependency** TypeScript client for
+> the Riot Games API (League of Legends, Teamfight Tactics and the Riot Account
+> API). It is the evolution of `twisted`, rebuilt around a Supabase-style query
+> builder, lazy relation-aware chaining, a proactive rate limiter, pluggable
+> caching/transport, a leveled logger and async iterators.
+
+This file is the single, self-contained reference an LLM or coding agent needs to
+use yasuo correctly. It is kept in sync with the public API — if anything here
+disagrees with the source, the source (`src/index.ts` and the entities/namespaces)
+wins; please report the drift. Human-facing docs live at <https://docs.yasuo.gg/>
+(mirror of `docs/`); the machine copy is <https://docs.yasuo.gg/llms.txt>.
+
+- Package name / import specifier: `yasuo.js`
+- Targets: Node 18+, Bun, Deno, Cloudflare Workers. Dual ESM + CJS, single-file, full `.d.ts`.
+- Runtime dependencies: **none**. Redis / Cloudflare KV are bring-your-own (peer, never bundled).
+- Current version: see `package.json` (`version`).
+- Status: pre-1.0 — the surface can still change between releases.
+
+---
+
+## Mental model (read this first)
+
+Six facts explain almost everything:
+
+1. **Every namespace method returns a query builder, not data.** Nothing hits the
+   network until you call the terminal `.execute()` (or, for `stream*`, until you
+   iterate the returned `Paginator`).
+2. **`.execute()` resolves the entity/collection/scalar *directly* — there is no
+   wrapper.** DTO fields sit right on the returned value; `.error` and `.http` ride
+   alongside on the same object.
+3. **API failures do not throw.** On a non-2xx (or network error) the DTO fields
+   are absent, `.error` holds a typed `ApiError`, and `.http.ok` is `false`. On
+   success `.error` is `null`. Opt into throwing with `.execute({ throw: true })`.
+   The only unconditional throw is `ApiKeyMissingError` (a misuse, no request made).
+4. **References are lazy and relation-aware.** `byPuuid(...)` returns a `*Ref`
+   that `extends SingleQuery`. Executing it fetches that resource; calling a
+   *relation* off it (e.g. `.matchIds()`) fetches ONLY the related resource — the
+   intermediate is never requested. One request, not two.
+5. **Routing is two enums.** `Region` (platform: `KR`, `EUW`, `NA1`…) for per-shard
+   APIs; `RegionGroup` (regional: `AMERICAS`, `ASIA`, `EUROPE`, `SEA`) for
+   cross-region APIs (Account, Match-V5, TFT Match). Lazy relations derive routing
+   for you — name a region once.
+6. **No magic strings/numbers.** Every Riot constant is an exported enum.
+
+```ts
+import { Yasuo, Region, RegionGroup } from 'yasuo.js'
+
+const yasuo = new Yasuo(process.env.RIOT_API_KEY)
+
+// One request: the account. `.error` branch instead of try/catch.
+const account = await yasuo.riot.account
+  .byRiotId('Hide on bush', 'KR1', RegionGroup.ASIA)
+  .execute()
+if (account.error) throw account.error
+console.log(account.puuid)
+
+// One request: ONLY the match list (the summoner is never fetched).
+// Routing (KR -> ASIA) is derived automatically.
+const ids = await account.summoner(Region.KR).matchIds({ count: 5 }).execute()
+console.log(ids[0]) // 'KR_1234…' — `ids` IS the Collection, indexed like an array
+```
+
+---
+
+## Install
+
+```bash
+bun add yasuo.js
+# or: npm install yasuo.js  /  pnpm add yasuo.js  /  yarn add yasuo.js
+```
+
+## Construct a client
+
+The key can be a bare string, a config field, or omitted to read `RIOT_API_KEY`.
+
+```ts
+import { Yasuo, LogLevel } from 'yasuo.js'
+
+new Yasuo('RGAPI-...')                       // bare key
+new Yasuo({ key: 'RGAPI-...' })              // config object
+new Yasuo()                                   // reads process.env.RIOT_API_KEY
+
+const yasuo = new Yasuo({
+  key: process.env.RIOT_API_KEY,
+  rateLimit: true,          // proactive pacing — OFF by default
+  retry: { maxAttempts: 3 },// reactive 429/503 retries — ON by default
+  cache: true,              // response cache — OFF by default
+  concurrency: 20,          // max in-flight requests (default Infinity)
+  logLevel: LogLevel.INFO,  // SILENT by default
+})
+```
+
+Bun auto-loads `.env`. On Node, load it yourself (e.g. `node --env-file=.env`).
+
+### `YasuoConfig` — every field is optional
+
+| Option | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `key` | `string` | `RIOT_API_KEY` env | Riot API key. Missing → `ApiKeyMissingError` at request time. |
+| `baseUrl` | `string` | Riot host | URL template with `{routing}`/`{game}` placeholders; point at a proxy. |
+| `rateLimit` | `boolean \| RateLimiterOptions` | `false` | Proactive limiter (off). `true`/object enables it. Reactive retries stay on regardless. |
+| `retry` | `boolean \| RetryOptions` | `true` | Reactive retry for `429`/`5xx` (3 attempts, `retry-after`-aware). |
+| `concurrency` | `number` | `Infinity` | Cap on concurrent in-flight requests (semaphore). |
+| `httpClient` | `HttpClient` | `FetchHttpClient` | Custom transport (proxy, undici pool, mock). |
+| `middleware` | `HttpMiddleware[]` | `[]` | Global request middleware (axios-style onion). |
+| `cache` | `boolean \| CacheOptions` | `false` | Response cache. `true` → in-memory with per-namespace default TTLs. |
+| `logger` | `Logger` | console logger | Custom 4-method logger; overrides `logLevel`. |
+| `logLevel` | `LogLevel` | `SILENT` | Min log level; overridden by `YASUO_LOG_LEVEL`/`LOG_LEVEL`. |
+
+---
+
+## The execution model
+
+`.execute(options?)` runs a `SingleQuery`/`CollectionQuery` and resolves the result
+directly. `options` is `ExecuteOptions`:
+
+| Option | Effect |
+| --- | --- |
+| *(none)* | Resolve the entity/collection/`ValueResult`. `.error` on failure, never throws (except `ApiKeyMissingError`). |
+| `{ throw: true }` | Return the entity on success, **throw** the `ApiError` on failure. |
+| `{ raw: true }` | Return the untouched Riot payload, typed `unknown`. Use `execute<T>({ raw: true })` to assert a shape (no cast). |
+| `{ cache: false }` | Force-refresh: skip the cache read, still write the fresh response. |
+| `{ cache: true }` | Force read+write even where the namespace has caching disabled. |
+| `{ cache: { ttlMs } }` | Cache this write with a custom TTL. |
+
+```ts
+const s = await yasuo.lol.summoner.byPuuid('puuid', Region.KR).execute()
+if (s.error) { console.error(s.error.status, s.error.body); }
+else { console.log(s.summonerLevel, s.http.status, s.http.rateLimits.app); }
+
+const strict = await yasuo.lol.summoner.byPuuid('p', Region.KR).execute({ throw: true })
+const raw    = await yasuo.lol.summoner.byPuuid('p', Region.KR).execute({ raw: true })
+const typed  = await yasuo.lol.summoner.byPuuid('p', Region.KR)
+  .execute<{ puuid: string; summonerLevel: number }>({ raw: true })
+```
+
+### What every result carries
+
+A resolved entity / `Collection` / `ValueResult` exposes:
+
+- **DTO fields** — copied onto the instance (`summoner.summonerLevel`), fully typed.
+- **`.error`** — `ApiError | null`. Non-null → the request failed and DTO fields are absent.
+- **`.http`** — `ResponseInfo`: `{ status, headers, rateLimits, url, ok }`.
+  - `.http.ok` — `true` when `.error` is null.
+  - `.http.rateLimits` — `RateLimits`: `{ type, retryAfterSeconds, app[], method[], edgeTraceId }`.
+    Each `RateLimitWindow` is `{ limit, intervalSeconds, count? }`.
+
+`Collection<T>` **extends `Array<T>`** — index, spread, `for..of`, `.map`, `.filter`,
+`.length` all work — with `.error`/`.http` on the collection itself. Caveat: array
+methods that build a NEW array (`map`, `filter`, `slice`) return a plain `Array`
+without `.http`/`.error`; read those off the original collection first.
+
+Scalar endpoints (mastery score, challenge percentiles) resolve a `ValueResult<T>`
+— read the value via **`.value`**; `.error`/`.http` are on it too.
+
+`404`-as-empty: `spectator.active` resolves to `null` (not in a game), never an
+error, even with `{ throw: true }`. Only `404` is absorbed this way.
+
+---
+
+## Routing: `Region` vs `RegionGroup`
+
+- **`Region`** (platform) — `Region.KR`, `Region.EUW`, `Region.NA1`, `Region.EUN1`,
+  `Region.BR1`, `Region.JP1`, `Region.LA1`, `Region.LA2`, `Region.OC1`, `Region.TR1`,
+  `Region.RU`, … Used by Summoner, League, Champion Mastery, Champion, Spectator,
+  Status, Clash, Challenges.
+- **`RegionGroup`** (regional) — `AMERICAS`, `ASIA`, `EUROPE`, `SEA`. Used by
+  Match-V5, TFT Match. The **Account** API accepts only `AMERICAS`, `ASIA`, `EUROPE`
+  (typed `AccountRegionGroup`).
+
+`byRiotId` takes a `RegionGroup`; `byPuuid` takes a `Region`. Lazy relations map
+between them automatically (a `KR` summoner streams matches from `ASIA` with no
+re-specification).
+
+---
+
+## Namespaces & endpoints
+
+Access shape: `yasuo.lol.*`, `yasuo.tft.*`, `yasuo.riot.account`, `yasuo.dataDragon`.
+Every method below returns a query — run it with `.execute()` — unless marked
+`Paginator` (iterate with `for await`) or under Data Dragon (awaited DTOs).
+`(deprecated)` methods still work but Riot is phasing out encrypted ids for PUUIDs.
+
+### League of Legends — `yasuo.lol`
+
+**`yasuo.lol.summoner`** (SUMMONER-V4, `Region`)
+- `byPuuid(puuid, region)` → lazy `SummonerRef extends SingleQuery` → `SummonerEntity`
+- `byId(summonerId, region)` *(deprecated)* → `SummonerEntity`
+- `byAccountId(accountId, region)` *(deprecated)* → `SummonerEntity`
+
+**`yasuo.lol.league`** (LEAGUE-V4, `Region`)
+- `byPuuid(puuid, region)` → `Collection<LeagueEntryEntity>`
+- `bySummonerId(summonerId, region)` *(deprecated)* → `Collection<LeagueEntryEntity>`
+- `entries(queue, tier, division, region, page?)` → `Collection<LeagueEntryEntity>`
+- `expEntries(queue, tier, division, region, page?)` → `Collection<LeagueEntryEntity>` (LEAGUE-EXP-V4)
+- `streamEntries(queue, tier, division, region, options?)` → `Paginator<LeagueEntryEntity>`
+- `challenger(queue, region)` / `grandmaster(queue, region)` / `master(queue, region)` → `LeagueListEntity`
+- `byId(leagueId, region)` → `LeagueListEntity`
+
+**`yasuo.lol.mastery`** (CHAMPION-MASTERY-V4, `Region`)
+- `byPuuid(puuid, region)` → `Collection<ChampionMasteryEntity>`
+- `byChampion(puuid, championId, region)` → `ChampionMasteryEntity`
+- `top(puuid, region, count?)` → `Collection<ChampionMasteryEntity>`
+- `score(puuid, region)` → `ValueResult<number>` (read `.value`)
+
+**`yasuo.lol.champion`** (CHAMPION-V3, `Region`)
+- `rotation(region)` → `ChampionRotationEntity`
+
+**`yasuo.lol.match`** (MATCH-V5, `RegionGroup`)
+- `get(matchId, regionGroup)` → `MatchEntity`
+- `timeline(matchId, regionGroup)` → `MatchTimelineEntity`
+- `idsByPuuid(puuid, regionGroup, query?)` → `Collection<string>`
+- `byPuuid(puuid, regionGroup, query?)` → `Collection<MatchEntity>` (ids + hydrate)
+- `streamIds(puuid, regionGroup, options?)` → `Paginator<string>`
+- `streamMatches(puuid, regionGroup, options?)` → `Paginator<MatchEntity>`
+- `MatchIdsQuery`: `{ start?, count?, startTime?, endTime?, queue?, type? }` (`queue` and `type` are mutually exclusive)
+
+**`yasuo.lol.spectator`** (SPECTATOR-V5, `Region`)
+- `active(puuid, region)` → `CurrentGameEntity | null` (null = not in a game)
+- `featured(region)` → `FeaturedGamesEntity`
+
+**`yasuo.lol.status`** (LOL-STATUS-V4, `Region`)
+- `get(region)` → `PlatformStatusEntity`
+
+**`yasuo.lol.clash`** (CLASH-V1, `Region`)
+- `playersByPuuid(puuid, region)` → `Collection<ClashPlayerEntity>`
+- `teamById(teamId, region)` → `ClashTeamEntity`
+- `tournaments(region)` → `Collection<ClashTournamentEntity>`
+- `tournamentByTeam(teamId, region)` → `ClashTournamentEntity`
+- `tournamentById(tournamentId, region)` → `ClashTournamentEntity`
+
+**`yasuo.lol.challenges`** (LOL-CHALLENGES-V1, `Region`)
+- `config(region)` → `Collection<ChallengeConfigEntity>`
+- `percentiles(region)` → `ValueResult<AllChallengePercentilesDTO>` (read `.value`)
+- `configById(challengeId, region)` → `ChallengeConfigEntity`
+- `leaderboards(challengeId, level, region, limit?)` → `Collection<ChallengeApexPlayerDTO>`
+- `percentilesById(challengeId, region)` → `ChallengePercentilesEntity`
+- `player(puuid, region)` → `PlayerChallengesEntity`
+
+### Teamfight Tactics — `yasuo.tft`
+
+**`yasuo.tft.summoner`** (TFT-SUMMONER-V1, `Region`)
+- `byPuuid(puuid, region)` → lazy `TftSummonerRef extends SingleQuery` → `TftSummonerEntity`
+- `byId(summonerId, region)` *(deprecated)* → `TftSummonerEntity`
+
+**`yasuo.tft.league`** (TFT-LEAGUE-V1, `Region`)
+- `byPuuid(puuid, region)` → `Collection<TftLeagueEntryEntity>`
+- `bySummonerId(summonerId, region)` *(deprecated)* → `Collection<TftLeagueEntryEntity>`
+- `entries(tier, division, region, page?)` → `Collection<TftLeagueEntryEntity>`
+- `challenger(region)` / `grandmaster(region)` / `master(region)` → `TftLeagueListEntity`
+- `byId(leagueId, region)` → `TftLeagueListEntity`
+- `ratedLadder(region, queue?)` → `Collection<TftRatedLadderEntryEntity>`
+
+**`yasuo.tft.match`** (TFT-MATCH-V1, `RegionGroup`)
+- `idsByPuuid(puuid, regionGroup, query?)` → `Collection<string>`
+- `get(matchId, regionGroup)` → `TftMatchEntity`
+- `byPuuid(puuid, regionGroup, query?)` → `Collection<TftMatchEntity>`
+- `streamMatches(puuid, regionGroup, options?)` → `Paginator<TftMatchEntity>`
+
+**`yasuo.tft.spectator`** (SPECTATOR-TFT-V5, `Region`)
+- `active(puuid, region)` → `CurrentGameEntity | null`
+- `featured(region)` → `FeaturedGamesEntity`
+
+### Riot Account — `yasuo.riot.account` (ACCOUNT-V1, `AccountRegionGroup`)
+
+- `byPuuid(puuid, regionGroup)` → `AccountEntity`
+- `byRiotId(gameName, tagLine, regionGroup)` → `AccountEntity`
+- `activeShard(game, puuid, regionGroup)` → `ActiveShardEntity`
+- `activeRegion(game, puuid, regionGroup)` → `AccountRegionEntity`
+
+### Data Dragon — `yasuo.dataDragon`
+
+Public static-data CDN. **No API key, not rate-limited, bypasses the executor.**
+Returns raw DTO promises directly (no query builder, no `.execute()`, no entities).
+`versions()` and per-locale champion lists are memoised in-process.
+
+- `versions()` → `string[]`
+- `languages()` → `string[]`
+- `realm(server)` → `DDragonRealmDTO`
+- `champions(language?)` → `DDragonChampionListDTO`
+- `champion(name, language?)` → `DDragonChampionDetailDTO`
+- `championById(championId, language?)` → `DDragonChampionSummaryDTO | null`
+- `runesReforged(language?)` → `DDragonRunesReforgedDTO[]`
+- `queues()` / `maps()` / `gameModes()` / `gameTypes()` / `seasons()` → respective `DDragon*DTO[]`
+
+```ts
+const versions = await yasuo.dataDragon.versions()
+const champions = await yasuo.dataDragon.champions()
+```
+
+---
+
+## Lazy relations
+
+`byPuuid(...)` returns a `*Ref` (a `SingleQuery` subclass). `.execute()` fetches the
+resource; a relation fetches ONLY the related resource (the ref already holds the
+puuid + region, so it delegates straight to the right namespace).
+
+`SummonerRef` / `SummonerEntity` relations (each is one request; routing derived):
+
+| Method | Returns |
+| --- | --- |
+| `account()` | `SingleQuery<AccountEntity>` |
+| `leagueEntries()` | `CollectionQuery<LeagueEntryEntity>` |
+| `championMasteries()` | `CollectionQuery<ChampionMasteryEntity>` |
+| `topChampionMasteries(count?)` | `CollectionQuery<ChampionMasteryEntity>` |
+| `championMastery(championId)` | `SingleQuery<ChampionMasteryEntity>` |
+| `masteryScore()` | `SingleQuery<ValueResult<number>>` |
+| `matchIds(query?)` | `CollectionQuery<string>` |
+| `matches(query?)` | `CollectionQuery<MatchEntity>` |
+| `streamMatchIds(options?)` | `Paginator<string>` |
+| `streamMatches(options?)` | `Paginator<MatchEntity>` |
+| `activeGame()` | `SingleQuery<CurrentGameEntity \| null>` |
+| `clashPlayers()` | `CollectionQuery<ClashPlayerEntity>` |
+| `challenges()` | `SingleQuery<PlayerChallengesEntity>` |
+
+`AccountEntity`: `.summoner(region)` → `SummonerRef`, `.tftSummoner(region)` →
+`TftSummonerRef`, `.activeRegion(game)`, `.activeShard(game)`.
+`MatchEntity`: `.timeline()` → query; `.summoners()` → `SummonerRef[]` (region from
+`info.platformId`); `.winningTeam()` → computed locally, no request.
+
+> `await ref` (the old thenable) is gone — always finish with `.execute()`.
+
+```ts
+const ref = account.summoner(Region.KR)                 // no request yet
+const matches = await ref.matches({ count: 20, type: MatchType.RANKED }).execute()
+const masteries = await ref.topChampionMasteries(5).execute()
+const live = await ref.activeGame().execute()           // CurrentGameEntity | null
+const score = await ref.masteryScore().execute()        // scalar → read .value
+console.log(score.value ?? 0)
+```
+
+---
+
+## Pagination & streaming
+
+`stream*` methods return a `Paginator<T>` **directly** (no `.execute()`). It is a
+lazy `AsyncIterable` — pages are fetched on demand, each through the rate limiter.
+**Iteration throws on failure** (unlike `.execute()`) — every page is fetched with
+`{ throw: true }` internally, so wrap `for await`/helpers in `try/catch`.
+
+Four ways to consume:
+
+```ts
+// 1. item by item
+for await (const id of yasuo.lol.match.streamIds(puuid, RegionGroup.ASIA)) { /* … */ }
+// 2. collect (optional cap; pages past the cap are never fetched)
+const first50 = await yasuo.lol.match.streamIds(puuid, RegionGroup.ASIA).toArray(50)
+// 3. first item or null
+const latest = await yasuo.lol.match.streamIds(puuid, RegionGroup.ASIA).first()
+// 4. page by page — Page<T> = { items, meta, cursor }
+for await (const page of yasuo.lol.match.streamMatches(puuid, RegionGroup.ASIA).pages()) {
+  await persist(page.items); console.log(page.cursor, page.meta.rateLimits.app)
+}
+```
+
+`MatchStreamOptions` (offset-based): `{ start?=0, pageSize?=100, maxItems?, startTime?, endTime?, queue?, type? }`.
+`LeagueStreamOptions` (page-based): `{ startPage?=1, maxItems? }`.
+`break` costs nothing (lazy) — no further pages fetched. Resume by persisting the
+last `cursor` and passing it as `start` (matches) / `startPage` (ladder).
+
+---
+
+## Rate limiting
+
+Riot enforces an **application** limit and a **method** limit per key. yasuo defends
+both on two fronts:
+
+- **Reactive (on by default).** Honours `retry-after` with bounded exponential
+  backoff on `429`/`5xx`. Retries happen before the error surfaces — you only see a
+  `RateLimitError`/`ServiceUnavailableError` once attempts are exhausted.
+- **Proactive (opt-in, `rateLimit: true`).** Sliding-window pacing under the
+  advertised limits (per-host app bucket + per-endpoint method bucket), learned from
+  response headers. Bootstrap defaults to Riot dev-key limits (20/s, 100/2min).
+
+```ts
+new Yasuo({ key })                              // reactive retries only (default)
+new Yasuo({ key, rateLimit: true })             // + proactive pacing
+new Yasuo({ key, retry: { maxAttempts: 5, backoffBaseMs: 250, retryOnServiceUnavailable: false } })
+```
+
+`RateLimiterOptions`: `{ enabled?, bootstrapAppWindows?, syncWithHeaders?=true, clock? }`.
+`RetryOptions`: `{ enabled?=true, maxAttempts?=3, maxRetryAfterSeconds?=120, retryOnServiceUnavailable?=true, backoffBaseMs?=1000 }`.
+Inspect budget at runtime via `result.http.rateLimits` (`.app`, `.method`,
+`.retryAfterSeconds`, `.type`, `.edgeTraceId`). `concurrency` caps in-flight
+requests independently of pacing.
+
+---
+
+## Caching (opt-in, off by default)
+
+Served **before the rate limiter** — a hit is instant and costs no quota. Keyed by
+resolved URL. Only 2xx responses are stored. Each namespace has a tuned default TTL.
+
+```ts
+new Yasuo({ key, cache: true })                         // in-memory, per-namespace TTLs
+new Yasuo({ key, cache: { ttlMs: 30_000 } })            // blanket 30s
+new Yasuo({ key, cache: { namespaces: {
+  'lol.match': { ttlMs: 86_400_000 },                   // immutable — a full day
+  'lol.spectator': { enabled: false },                  // never cache live games
+} } })
+```
+
+`CacheOptions`: `{ enabled?, store?, ttlMs?, namespaces? }`. `store` accepts a
+`CacheStore`, or a raw Redis client / Cloudflare KV binding (auto-wrapped in
+`RedisCache`/`KVCache`). Per-call override: `execute({ cache })` (see the execution
+table). Default TTLs: `riot.account` 1h, `lol.champion`/`lol.match`/`tft.match` 1h,
+`lol.summoner`/`tft.summoner`/`lol.clash`/`lol.mastery` 5min, `lol.status` 2min,
+`lol.league`/`tft.league` 1min, `lol.challenges` 10min, spectator 10s.
+
+Stores:
+- **`MemoryCache`** — default; per-process `Map`, FIFO eviction, `{ maxEntries?=10000, clock? }`.
+- **`RedisCache(client, { keyPrefix?='yasuo:' })`** — any `RedisClientLike` (`get`,
+  `set(k,v,'PX',ttl)`, `del`), e.g. Bun's `redis` or `ioredis`. Shared across processes.
+- **`KVCache(binding, { keyPrefix? })`** — Cloudflare KV; min TTL 60s (clamped).
+- **Custom `CacheStore`** — `get/set/delete/clear`, sync or async. `CachedResult = { data, meta }`.
+
+`RedisCache.clear()` / `KVCache.clear()` throw by design (no implicit shared flush).
+
+---
+
+## HTTP transport & middleware
+
+**Custom client** — implement `HttpClient` (`send(request): Promise<HttpResponse>`).
+`HttpRequest = { url, method, headers, signal? }`; `HttpResponse = { status, ok,
+headers, body }` with lower-cased header keys and a pre-parsed body. Default is
+`FetchHttpClient` (accepts a custom `fetch`).
+
+**Middleware** — axios-style onion `(request, next, context) => Promise<response>`.
+Register global (`config.middleware` / `yasuo.use(...)`) and per-service
+(`yasuo.lol.match.use(...)`); global wraps per-service wraps transport; within a
+level, registration order (first = outermost). `MiddlewareContext = { endpointId,
+routing, attempt }`. Middleware can rewrite the request, inspect/replace the
+response, short-circuit (skip `next`), or retry (`next` more than once). It does not
+run for `yasuo.dataDragon.*`.
+
+```ts
+const timing: HttpMiddleware = async (req, next, { endpointId }) => {
+  const started = Date.now(); const res = await next(req)
+  console.log(`${endpointId} ${res.status} in ${Date.now() - started}ms`); return res
+}
+const yasuo = new Yasuo({ key, middleware: [timing] })
+yasuo.use((req, next) => next({ ...req, headers: { ...req.headers, 'x-app': 'bot' } }))
+yasuo.lol.match.use((req, next) => next(req))
+```
+
+For tests, inject a fake `HttpClient` — no network needed.
+
+---
+
+## Logging
+
+Leveled, **silent by default**. `LogLevel`: `DEBUG(10) < INFO(20) < WARN(30) <
+ERROR(40) < SILENT(100)`. A logger emits at or above its level.
+
+Configure (precedence high→low): explicit `logger` (4 methods `debug/info/warn/error`,
+each `(message, ...args) => void`; wins outright) > `logLevel` in config >
+`YASUO_LOG_LEVEL` env > `LOG_LEVEL` env > `SILENT`. Built-in console logger prefixes
+`[yasuo]`. What's logged: `debug` = `cache hit`/`GET <url>`; `warn` = reactive retry;
+`error` = final failure. `info` is unused internally (available to custom loggers).
+
+---
+
+## Errors
+
+```
+YasuoError                     // base for everything yasuo throws/produces
+├── ApiKeyMissingError         // no key — misuse; ALWAYS thrown (no request made)
+└── ApiError                   // base for every non-2xx Riot response + network failures
+    ├── UnauthorizedError      // 401
+    ├── ForbiddenError         // 403
+    ├── NotFoundError          // 404
+    ├── RateLimitError         // 429
+    └── ServiceUnavailableError// 502 / 503 / 504
+```
+
+- API failures land on `.error` (never thrown) unless you pass `{ throw: true }`.
+- `ApiKeyMissingError` is the sole exception — it always throws (extends `YasuoError`,
+  not `ApiError`; no status/url/rateLimits).
+- A transport/network failure (DNS, TLS, timeout) → plain `ApiError` with `status: 0`,
+  `response: null`, `body` = the underlying cause.
+- Every `ApiError` carries: `.status`, `.url`, `.method`, `.rateLimits` (with
+  `.retryAfterSeconds` on 429), `.body`, `.headers`, `.response`.
+- `instanceof` is reliable across ESM/CJS/ES5 (prototype restored in the constructor).
+- **Streams throw** on failure mid-iteration (they use `{ throw: true }` internally).
+
+```ts
+import { ApiError, NotFoundError, RateLimitError, YasuoError } from 'yasuo.js'
+
+const s = await yasuo.lol.summoner.byPuuid(puuid, Region.KR).execute()
+if (s.error instanceof NotFoundError) { /* no such puuid */ }
+else if (s.error instanceof RateLimitError) { await sleep((s.error.rateLimits.retryAfterSeconds ?? 1) * 1000) }
+else if (s.error instanceof ApiError) { console.error(s.error.status, s.error.url) }
+else { console.log(s.summonerLevel) } // s.error is null here
+
+// throw-style:
+try { const x = await yasuo.lol.summoner.byPuuid(puuid, Region.KR).execute({ throw: true }) }
+catch (err) { if (err instanceof YasuoError) { /* from yasuo */ } else throw err }
+```
+
+---
+
+## Enums (no magic strings)
+
+Import from `'yasuo.js'`. Common ones:
+
+- `Region` — platform routing (`KR`, `EUW`, `NA1`, `EUN1`, `BR1`, `JP1`, `LA1`, `LA2`, `OC1`, `TR1`, `RU`, …).
+- `RegionGroup` — regional routing (`AMERICAS`, `ASIA`, `EUROPE`, `SEA`). `AccountRegionGroup` = the first three only.
+- `Game` — `LOL`, `TFT`, `VAL`, `LOR` (for account active-shard/region).
+- `RankedQueue` — `SOLO_5x5`, `FLEX_SR`, `FLEX_TT`, …
+- `Tier` — `IRON`…`CHALLENGER`. `Division` — `I`, `II`, `III`, `IV`.
+- `MatchType` — `RANKED`, `NORMAL`, `TOURNAMENT`, … (match-list `type` filter).
+- `ChallengeLevel` — `NONE`…`CHALLENGER` (challenge leaderboards).
+- `TftRatedLadderQueue` — TFT rated-ladder queue.
+- `LogLevel` — see Logging.
+
+DTOs (`*DTO`, raw wire shapes) and entities (`*Entity`) are all exported too.
+
+---
+
+## Full public surface (`import { … } from 'yasuo.js'`)
+
+- Client: `Yasuo`. Config types: `YasuoConfig`, `RetryOptions`, `CacheOptions`, `NamespaceCacheOptions`, `Resolved*`.
+- Query: `SingleQuery`, `CollectionQuery`; types `ExecuteOptions`, `ExecuteCacheOptions`, `QueryRunner`.
+- Caching: `MemoryCache`, `RedisCache`, `KVCache`, `coerceCacheStore`; types `CacheStore`, `CacheStoreLike`, `CachedResult`, `*CacheOptions`, `RedisClientLike`, `KVNamespaceLike`.
+- HTTP: `FetchHttpClient`; types `HttpClient`, `HttpRequest`, `HttpResponse`.
+- Middleware: `composeMiddleware`; types `HttpMiddleware`, `HttpHandler`, `MiddlewareContext`.
+- Logging: `LogLevel`, `createConsoleLogger`, `noopLogger`, `parseLogLevel`, `resolveLogLevel`; type `Logger`.
+- Pagination: `Paginator`; types `Page`, `PaginatorConfig`.
+- Rate limiting: `RateLimiter`; type `RateLimiterOptions`.
+- Endpoints (advanced): `LOL_ENDPOINTS`, `TFT_ENDPOINTS`, `RIOT_ENDPOINTS`; type `Endpoint`.
+- Errors: `YasuoError`, `ApiError`, `ApiKeyMissingError`, `UnauthorizedError`, `ForbiddenError`, `NotFoundError`, `RateLimitError`, `ServiceUnavailableError`.
+- Enums: all of `src/enums`. Entities: all `*Entity`. DTOs: all `*DTO`.
+
+---
+
+## Docs map (human-readable, `docs/`)
+
+- getting-started.md — install, construct, first call
+- entities-and-relations.md — the entity/collection/lazy-ref model
+- rate-limiting.md · caching.md · logging.md · pagination.md · errors.md
+- http-and-middleware.md — transport & middleware
+- api/*.md — per-namespace reference (params, returns, runnable examples)
+- endpoints.md — flat one-line-per-endpoint coverage
+- migrating-from-twisted.md — the twisted → yasuo mapping
+- architecture.md — internal binding conventions

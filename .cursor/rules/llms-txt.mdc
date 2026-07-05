@@ -1,0 +1,49 @@
+---
+description: Keep docs/llms.txt (the LLM-facing manual) in sync with the public API. Consult when changing any namespace method, the execute/config/error/enum/cache/rate-limit/middleware/pagination model, or exports in src/index.ts.
+globs: src/**/*.ts, docs/**/*.md, docs/llms.txt, examples/**/*.ts, README.md
+alwaysApply: false
+---
+
+# Keep `docs/llms.txt` up to date
+
+`docs/llms.txt` is the single, self-contained reference an LLM or coding agent
+reads to use **yasuo** correctly. MkDocs copies it verbatim to
+<https://docs.yasuo.gg/llms.txt> at build time — it is a non-`.md` static file, so
+it needs **no** `nav`/`mkdocs.yml` entry and does not trip `docs:build --strict`.
+
+**It is hand-maintained, not generated.** So it only stays correct if you update it
+in the *same change* that alters the public surface. This is part of the repo's
+"keep the docs alive" contract — the machine copy is not exempt.
+
+## When you MUST update `docs/llms.txt`
+
+Update it whenever a change touches anything an agent relies on to call yasuo:
+
+- A namespace method's **name, parameters, or return type** (`yasuo.lol.*`,
+  `yasuo.tft.*`, `yasuo.riot.account`, `yasuo.dataDragon`) — including new/removed
+  endpoints and `(deprecated)` flags.
+- The **`execute()` model**: `ExecuteOptions` (`throw` / `raw` / `cache`), the
+  `.error` + `.http` result shape, `ValueResult`/`.value`, `Collection` behaviour,
+  or the `404`-as-`null` cases.
+- **Construction & config** (`YasuoConfig`) and its defaults.
+- The **error hierarchy**, **enums**, **caching**, **rate limiting / retries**,
+  **middleware / transport**, **logging**, or **pagination / streaming** models.
+- Any new/renamed/removed **export from `src/index.ts`** (update the "Full public
+  surface" section).
+- **Lazy-relation** methods on `SummonerRef`/`AccountEntity`/`MatchEntity` etc.
+
+## How to keep it right
+
+- **`src/` is the source of truth.** If `src/` and `docs/llms.txt` disagree, the
+  file is wrong — fix it. Mirror the guides under `docs/` and `endpoints.md`.
+- **Stay terse.** It is a machine-readable mirror of the docs, not a second copy of
+  every guide. One line per endpoint; short prose per concept.
+- **Do not pin the package version** inside it — `package.json` owns the version.
+- Keep the structure: mental model → install/construct → execute model → routing →
+  namespaces → relations → pagination → rate limiting → caching → transport →
+  logging → errors → enums → full public surface.
+
+## Before "done"
+
+`docs/llms.txt` reflects the new surface, and `bun run docs:build` (`--strict`)
+still passes (the file publishes automatically; no `mkdocs.yml` edit needed).
