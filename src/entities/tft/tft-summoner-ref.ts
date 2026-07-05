@@ -33,18 +33,14 @@ export class TftSummonerRef extends SingleQuery<TftSummonerEntity> {
     return this.client.riot.account.byPuuid(this.puuid, regionToAccountRegionGroup(this.region))
   }
 
+  /** The live TFT game, or `null` if not currently in one. */
+  activeGame(): SingleQuery<CurrentGameEntity | null> {
+    return this.client.tft.spectator.active(this.puuid, this.region)
+  }
+
   /** TFT ranked league entries. */
   leagueEntries(): CollectionQuery<TftLeagueEntryEntity> {
     return this.client.tft.league.byPuuid(this.puuid, this.region)
-  }
-
-  /**
-   * Ids of recent TFT matches.
-   *
-   * @param query - Optional filters (count, time range…).
-   */
-  matchIds(query?: TftMatchIdsQuery): CollectionQuery<string> {
-    return this.client.tft.match.idsByPuuid(this.puuid, regionToRegionGroup(this.region), query)
   }
 
   /**
@@ -54,6 +50,15 @@ export class TftSummonerRef extends SingleQuery<TftSummonerEntity> {
    */
   matches(query?: TftMatchIdsQuery): CollectionQuery<TftMatchEntity> {
     return this.client.tft.match.byPuuid(this.puuid, regionToRegionGroup(this.region), query)
+  }
+
+  /**
+   * Ids of recent TFT matches.
+   *
+   * @param query - Optional filters (count, time range…).
+   */
+  matchIds(query?: TftMatchIdsQuery): CollectionQuery<string> {
+    return this.client.tft.match.idsByPuuid(this.puuid, regionToRegionGroup(this.region), query)
   }
 
   /**
@@ -67,10 +72,5 @@ export class TftSummonerRef extends SingleQuery<TftSummonerEntity> {
       regionToRegionGroup(this.region),
       options,
     )
-  }
-
-  /** The live TFT game, or `null` if not currently in one. */
-  activeGame(): SingleQuery<CurrentGameEntity | null> {
-    return this.client.tft.spectator.active(this.puuid, this.region)
   }
 }

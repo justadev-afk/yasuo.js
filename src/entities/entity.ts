@@ -20,10 +20,10 @@ export abstract class Entity<TData extends object> {
   readonly error: ApiError | null
   /** HTTP context of the response (`status`, `headers`, `rateLimits`, `ok`, `url`). */
   readonly http: ResponseInfo
-  /** Raw response metadata, used internally by lazy relations. */
-  protected readonly meta: ResponseMeta
   /** Context used by lazy relations to make follow-up requests. */
   protected readonly context: EntityContext
+  /** Raw response metadata, used internally by lazy relations. */
+  protected readonly meta: ResponseMeta
 
   constructor(
     data: TData,

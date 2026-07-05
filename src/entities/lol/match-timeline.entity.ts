@@ -8,13 +8,13 @@ export interface MatchTimelineEntity extends MatchTimelineDTO {}
 
 /** A match timeline with a lazy relation back to the full match. */
 export class MatchTimelineEntity extends Entity<MatchTimelineDTO> {
-  private get regionGroup(): RegionGroup {
-    return this.context.regionGroup as RegionGroup
-  }
-
   /** The match id this timeline belongs to. */
   get id(): string {
     return this.metadata.matchId
+  }
+
+  private get regionGroup(): RegionGroup {
+    return this.context.regionGroup as RegionGroup
   }
 
   /** The full match this timeline belongs to (call `.execute()` to fetch). */

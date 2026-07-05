@@ -10,23 +10,6 @@ import { BaseNamespace } from '../base-namespace'
  */
 export class TftSummonerNamespace extends BaseNamespace {
   /**
-   * Look up a TFT summoner by PUUID.
-   *
-   * Returns a lazy, chainable {@link TftSummonerRef}: call `.execute()` to fetch the
-   * summoner, or a relation to fetch only that related resource.
-   *
-   * @param puuid - The player's PUUID.
-   * @param region - The platform region.
-   */
-  byPuuid(puuid: string, region: Region): TftSummonerRef {
-    const context = this.regionContext(region)
-    const query = this.single(TftSummonerEntity, region, TFT_ENDPOINTS.summonerByPuuid, context, {
-      pathParams: { puuid },
-    })
-    return new TftSummonerRef(this.client, puuid, region, (exec) => query.execute(exec))
-  }
-
-  /**
    * Look up a TFT summoner by encrypted summoner id.
    *
    * @param summonerId - The encrypted summoner id.
@@ -41,5 +24,22 @@ export class TftSummonerNamespace extends BaseNamespace {
       this.regionContext(region),
       { pathParams: { summonerId } },
     )
+  }
+
+  /**
+   * Look up a TFT summoner by PUUID.
+   *
+   * Returns a lazy, chainable {@link TftSummonerRef}: call `.execute()` to fetch the
+   * summoner, or a relation to fetch only that related resource.
+   *
+   * @param puuid - The player's PUUID.
+   * @param region - The platform region.
+   */
+  byPuuid(puuid: string, region: Region): TftSummonerRef {
+    const context = this.regionContext(region)
+    const query = this.single(TftSummonerEntity, region, TFT_ENDPOINTS.summonerByPuuid, context, {
+      pathParams: { puuid },
+    })
+    return new TftSummonerRef(this.client, puuid, region, (exec) => query.execute(exec))
   }
 }

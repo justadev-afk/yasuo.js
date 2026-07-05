@@ -13,13 +13,13 @@ export class ClashTeamEntity extends Entity<ClashTeamDTO> {
     return this.context.region as Region
   }
 
-  /** The tournament this team is registered for. */
-  tournament(): SingleQuery<ClashTournamentEntity> {
-    return this.context.client.lol.clash.tournamentById(this.tournamentId, this.region)
-  }
-
   /** Resolve the team captain's summoner (chainable). */
   captainSummoner(): SummonerRef {
     return this.context.client.lol.summoner.byPuuid(this.captain, this.region)
+  }
+
+  /** The tournament this team is registered for. */
+  tournament(): SingleQuery<ClashTournamentEntity> {
+    return this.context.client.lol.clash.tournamentById(this.tournamentId, this.region)
   }
 }

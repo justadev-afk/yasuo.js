@@ -43,40 +43,19 @@ const NOOP = (): void => {}
  * requests can never both observe a free slot and overshoot the limit.
  */
 export class RateLimiter {
-  private readonly enabled: boolean
-  private readonly clock: Clock
-  private readonly bootstrapAppWindows: readonly RateLimitWindow[]
-  private readonly syncWithHeaders: boolean
   private readonly appBuckets = new Map<string, RateLimitBucket>()
-  private readonly methodBuckets = new Map<string, RateLimitBucket>()
+  private readonly bootstrapAppWindows: readonly RateLimitWindow[]
+  private readonly clock: Clock
+  private readonly enabled: boolean
   private gate: Promise<void> = Promise.resolve()
+  private readonly methodBuckets = new Map<string, RateLimitBucket>()
+  private readonly syncWithHeaders: boolean
 
   constructor(options: RateLimiterOptions = {}) {
     this.enabled = options.enabled ?? true
     this.clock = options.clock ?? systemClock
     this.bootstrapAppWindows = options.bootstrapAppWindows ?? DEFAULT_BOOTSTRAP_APP_WINDOWS
     this.syncWithHeaders = options.syncWithHeaders ?? true
-  }
-
-  private getAppBucket(appKey: string): RateLimitBucket {
-    let bucket = this.appBuckets.get(appKey)
-    if (!bucket) {
-      bucket = new RateLimitBucket()
-      if (this.bootstrapAppWindows.length > 0) {
-        bucket.configure(this.bootstrapAppWindows, this.clock())
-      }
-      this.appBuckets.set(appKey, bucket)
-    }
-    return bucket
-  }
-
-  private getMethodBucket(methodKey: string): RateLimitBucket {
-    let bucket = this.methodBuckets.get(methodKey)
-    if (!bucket) {
-      bucket = new RateLimitBucket()
-      this.methodBuckets.set(methodKey, bucket)
-    }
-    return bucket
   }
 
   /**
@@ -96,47 +75,6 @@ export class RateLimiter {
         return
       }
       await sleep(wait)
-    }
-  }
-
-  /**
-   * Atomically inspect both buckets: if a slot is free, record the request and
-   * return `0`; otherwise return how long to wait before retrying. Serialised
-   * through {@link gate} so the check-and-record is race-free.
-   */
-  private reserve(appKey: string, methodKey: string): Promise<number> {
-    const run = this.gate.then(() => {
-      const now = this.clock()
-      const app = this.getAppBucket(appKey)
-      const method = this.getMethodBucket(methodKey)
-      const wait = Math.max(app.timeUntilAvailable(now), method.timeUntilAvailable(now))
-      if (wait <= 0) {
-        app.record(now)
-        method.record(now)
-      }
-      return wait
-    })
-    this.gate = run.then(NOOP, NOOP)
-    return run
-  }
-
-  /**
-   * Learn the real limits from a response's rate-limit headers.
-   *
-   * @param appKey - Application scope key.
-   * @param methodKey - Method scope key.
-   * @param rateLimits - Parsed headers from the response.
-   */
-  update(appKey: string, methodKey: string, rateLimits: RateLimits): void {
-    if (!this.enabled) {
-      return
-    }
-    const now = this.clock()
-    if (rateLimits.app.length > 0) {
-      this.getAppBucket(appKey).configure(this.stripCounts(rateLimits.app), now)
-    }
-    if (rateLimits.method.length > 0) {
-      this.getMethodBucket(methodKey).configure(this.stripCounts(rateLimits.method), now)
     }
   }
 
@@ -169,6 +107,68 @@ export class RateLimiter {
         this.getMethodBucket(methodKey).blockUntil(until)
         break
     }
+  }
+
+  /**
+   * Learn the real limits from a response's rate-limit headers.
+   *
+   * @param appKey - Application scope key.
+   * @param methodKey - Method scope key.
+   * @param rateLimits - Parsed headers from the response.
+   */
+  update(appKey: string, methodKey: string, rateLimits: RateLimits): void {
+    if (!this.enabled) {
+      return
+    }
+    const now = this.clock()
+    if (rateLimits.app.length > 0) {
+      this.getAppBucket(appKey).configure(this.stripCounts(rateLimits.app), now)
+    }
+    if (rateLimits.method.length > 0) {
+      this.getMethodBucket(methodKey).configure(this.stripCounts(rateLimits.method), now)
+    }
+  }
+
+  private getAppBucket(appKey: string): RateLimitBucket {
+    let bucket = this.appBuckets.get(appKey)
+    if (!bucket) {
+      bucket = new RateLimitBucket()
+      if (this.bootstrapAppWindows.length > 0) {
+        bucket.configure(this.bootstrapAppWindows, this.clock())
+      }
+      this.appBuckets.set(appKey, bucket)
+    }
+    return bucket
+  }
+
+  private getMethodBucket(methodKey: string): RateLimitBucket {
+    let bucket = this.methodBuckets.get(methodKey)
+    if (!bucket) {
+      bucket = new RateLimitBucket()
+      this.methodBuckets.set(methodKey, bucket)
+    }
+    return bucket
+  }
+
+  /**
+   * Atomically inspect both buckets: if a slot is free, record the request and
+   * return `0`; otherwise return how long to wait before retrying. Serialised
+   * through {@link gate} so the check-and-record is race-free.
+   */
+  private reserve(appKey: string, methodKey: string): Promise<number> {
+    const run = this.gate.then(() => {
+      const now = this.clock()
+      const app = this.getAppBucket(appKey)
+      const method = this.getMethodBucket(methodKey)
+      const wait = Math.max(app.timeUntilAvailable(now), method.timeUntilAvailable(now))
+      if (wait <= 0) {
+        app.record(now)
+        method.record(now)
+      }
+      return wait
+    })
+    this.gate = run.then(NOOP, NOOP)
+    return run
   }
 
   private stripCounts(windows: readonly RateLimitWindow[]): RateLimitWindow[] {

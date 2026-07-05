@@ -11,22 +11,6 @@ import { BaseNamespace } from '../base-namespace'
  */
 export class LolMasteryNamespace extends BaseNamespace {
   /**
-   * All champion mastery entries for a player.
-   *
-   * @param puuid - The player's PUUID.
-   * @param region - The platform region.
-   */
-  byPuuid(puuid: string, region: Region): CollectionQuery<ChampionMasteryEntity> {
-    return this.many(
-      ChampionMasteryEntity,
-      region,
-      LOL_ENDPOINTS.masteryByPuuid,
-      this.regionContext(region),
-      { pathParams: { puuid } },
-    )
-  }
-
-  /**
    * A player's mastery of a single champion.
    *
    * @param puuid - The player's PUUID.
@@ -48,6 +32,33 @@ export class LolMasteryNamespace extends BaseNamespace {
   }
 
   /**
+   * All champion mastery entries for a player.
+   *
+   * @param puuid - The player's PUUID.
+   * @param region - The platform region.
+   */
+  byPuuid(puuid: string, region: Region): CollectionQuery<ChampionMasteryEntity> {
+    return this.many(
+      ChampionMasteryEntity,
+      region,
+      LOL_ENDPOINTS.masteryByPuuid,
+      this.regionContext(region),
+      { pathParams: { puuid } },
+    )
+  }
+
+  /**
+   * A player's total champion mastery score. The scalar `number` is boxed in a
+   * {@link ValueResult} — read it from `.value`.
+   *
+   * @param puuid - The player's PUUID.
+   * @param region - The platform region.
+   */
+  score(puuid: string, region: Region): SingleQuery<ValueResult<number>> {
+    return this.scalar<number>(region, LOL_ENDPOINTS.masteryScore, { pathParams: { puuid } })
+  }
+
+  /**
    * A player's highest champion masteries.
    *
    * @param puuid - The player's PUUID.
@@ -62,16 +73,5 @@ export class LolMasteryNamespace extends BaseNamespace {
       this.regionContext(region),
       { pathParams: { puuid }, query: { count } },
     )
-  }
-
-  /**
-   * A player's total champion mastery score. The scalar `number` is boxed in a
-   * {@link ValueResult} — read it from `.value`.
-   *
-   * @param puuid - The player's PUUID.
-   * @param region - The platform region.
-   */
-  score(puuid: string, region: Region): SingleQuery<ValueResult<number>> {
-    return this.scalar<number>(region, LOL_ENDPOINTS.masteryScore, { pathParams: { puuid } })
   }
 }

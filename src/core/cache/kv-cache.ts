@@ -63,8 +63,14 @@ export class KVCache implements CacheStore {
     this.keyPrefix = options.keyPrefix ?? 'yasuo:'
   }
 
-  private prefixed(key: string): string {
-    return `${this.keyPrefix}${key}`
+  async clear(): Promise<void> {
+    // Intentionally unsupported: KV has no atomic flush, and clearing a shared
+    // namespace is dangerous. List and delete specific keys out-of-band instead.
+    throw new Error('KVCache.clear() is not supported; delete specific keys instead')
+  }
+
+  async delete(key: string): Promise<void> {
+    await this.namespace.delete(this.prefixed(key))
   }
 
   async get(key: string): Promise<CachedResult | undefined> {
@@ -87,13 +93,7 @@ export class KVCache implements CacheStore {
     await this.namespace.put(this.prefixed(key), JSON.stringify(value), { expirationTtl })
   }
 
-  async delete(key: string): Promise<void> {
-    await this.namespace.delete(this.prefixed(key))
-  }
-
-  async clear(): Promise<void> {
-    // Intentionally unsupported: KV has no atomic flush, and clearing a shared
-    // namespace is dangerous. List and delete specific keys out-of-band instead.
-    throw new Error('KVCache.clear() is not supported; delete specific keys instead')
+  private prefixed(key: string): string {
+    return `${this.keyPrefix}${key}`
   }
 }

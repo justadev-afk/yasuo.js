@@ -27,6 +27,24 @@ export class AccountEntity extends Entity<AccountDTO> {
   }
 
   /**
+   * The player's active region for a game (LoL/TFT).
+   *
+   * @param game - The game to resolve the active region for.
+   */
+  activeRegion(game: Game): SingleQuery<AccountRegionEntity> {
+    return this.context.client.riot.account.activeRegion(game, this.puuid, this.routingGroup)
+  }
+
+  /**
+   * The player's active shard for a game.
+   *
+   * @param game - The game to resolve the active shard for.
+   */
+  activeShard(game: Game): SingleQuery<ActiveShardEntity> {
+    return this.context.client.riot.account.activeShard(game, this.puuid, this.routingGroup)
+  }
+
+  /**
    * Resolve this account's League of Legends summoner on a given platform
    * region (chainable — traverse further without awaiting).
    *
@@ -44,23 +62,5 @@ export class AccountEntity extends Entity<AccountDTO> {
    */
   tftSummoner(region: Region): TftSummonerRef {
     return this.context.client.tft.summoner.byPuuid(this.puuid, region)
-  }
-
-  /**
-   * The player's active region for a game (LoL/TFT).
-   *
-   * @param game - The game to resolve the active region for.
-   */
-  activeRegion(game: Game): SingleQuery<AccountRegionEntity> {
-    return this.context.client.riot.account.activeRegion(game, this.puuid, this.routingGroup)
-  }
-
-  /**
-   * The player's active shard for a game.
-   *
-   * @param game - The game to resolve the active shard for.
-   */
-  activeShard(game: Game): SingleQuery<ActiveShardEntity> {
-    return this.context.client.riot.account.activeShard(game, this.puuid, this.routingGroup)
   }
 }

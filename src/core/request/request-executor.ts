@@ -60,16 +60,21 @@ export interface Fetched<T> {
  * 8. Otherwise throw the most specific {@link ApiError}.
  */
 export class RequestExecutor {
-  private readonly key: string
+  /** Whether an API key is configured. */
+  get hasKey(): boolean {
+    return this.key.length > 0
+  }
+
   private readonly baseUrl: string
+  private readonly cache: CacheStore | null
+  private readonly cacheTtlMs: number
+  private readonly httpClient: HttpClient
+  private readonly key: string
+  private readonly logger: Logger
+  private readonly middleware: HttpMiddleware[]
   private readonly rateLimiter: RateLimiter
   private readonly retry: ResolvedRetryOptions
   private readonly semaphore: Semaphore
-  private readonly httpClient: HttpClient
-  private readonly logger: Logger
-  private readonly cache: CacheStore | null
-  private readonly cacheTtlMs: number
-  private readonly middleware: HttpMiddleware[]
 
   constructor(config: YasuoConfig) {
     this.key = config.key ?? readEnvKey()
@@ -83,20 +88,6 @@ export class RequestExecutor {
     const cache = resolveCacheOptions(config.cache)
     this.cache = cache.store
     this.cacheTtlMs = cache.ttlMs
-  }
-
-  /** Whether an API key is configured. */
-  get hasKey(): boolean {
-    return this.key.length > 0
-  }
-
-  /**
-   * Register a global {@link HttpMiddleware}, appended after any already
-   * present (so it becomes the innermost of the global layers). Applies to
-   * every subsequent request across all services.
-   */
-  use(middleware: HttpMiddleware): void {
-    this.middleware.push(middleware)
   }
 
   /**
@@ -214,6 +205,23 @@ export class RequestExecutor {
     }
   }
 
+  /**
+   * Register a global {@link HttpMiddleware}, appended after any already
+   * present (so it becomes the innermost of the global layers). Applies to
+   * every subsequent request across all services.
+   */
+  use(middleware: HttpMiddleware): void {
+    this.middleware.push(middleware)
+  }
+
+  /** Milliseconds to wait before a retry: `retry-after` if present, else backoff. */
+  private computeRetryWaitMs(retryAfterSeconds: number | null, attempt: number): number {
+    if (retryAfterSeconds !== null && retryAfterSeconds > 0) {
+      return Math.min(retryAfterSeconds, this.retry.maxRetryAfterSeconds) * MS_PER_SECOND
+    }
+    return this.retry.backoffBaseMs * 2 ** (attempt - 1)
+  }
+
   /** Whether an HTTP status is eligible for a reactive retry. */
   private isRetryable(status: number): boolean {
     if (status === HttpStatus.TOO_MANY_REQUESTS) {
@@ -225,14 +233,6 @@ export class RequestExecutor {
         status === HttpStatus.SERVICE_UNAVAILABLE ||
         status === HttpStatus.GATEWAY_TIMEOUT)
     )
-  }
-
-  /** Milliseconds to wait before a retry: `retry-after` if present, else backoff. */
-  private computeRetryWaitMs(retryAfterSeconds: number | null, attempt: number): number {
-    if (retryAfterSeconds !== null && retryAfterSeconds > 0) {
-      return Math.min(retryAfterSeconds, this.retry.maxRetryAfterSeconds) * MS_PER_SECOND
-    }
-    return this.retry.backoffBaseMs * 2 ** (attempt - 1)
   }
 }
 

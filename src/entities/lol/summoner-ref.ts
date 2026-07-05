@@ -49,23 +49,19 @@ export class SummonerRef extends SingleQuery<SummonerEntity> {
     return this.client.riot.account.byPuuid(this.puuid, regionToAccountRegionGroup(this.region))
   }
 
-  /** Ranked league entries in every queue. */
-  leagueEntries(): CollectionQuery<LeagueEntryEntity> {
-    return this.client.lol.league.byPuuid(this.puuid, this.region)
+  /** The live game, or `null` if not currently in one. */
+  activeGame(): SingleQuery<CurrentGameEntity | null> {
+    return this.client.lol.spectator.active(this.puuid, this.region)
+  }
+
+  /** Challenge progress. */
+  challenges(): SingleQuery<PlayerChallengesEntity> {
+    return this.client.lol.challenges.player(this.puuid, this.region)
   }
 
   /** Champion mastery, one entry per champion played. */
   championMasteries(): CollectionQuery<ChampionMasteryEntity> {
     return this.client.lol.mastery.byPuuid(this.puuid, this.region)
-  }
-
-  /**
-   * Highest champion masteries.
-   *
-   * @param count - How many top entries to return.
-   */
-  topChampionMasteries(count?: number): CollectionQuery<ChampionMasteryEntity> {
-    return this.client.lol.mastery.top(this.puuid, this.region, count)
   }
 
   /**
@@ -77,18 +73,19 @@ export class SummonerRef extends SingleQuery<SummonerEntity> {
     return this.client.lol.mastery.byChampion(this.puuid, championId, this.region)
   }
 
+  /** Active Clash registrations. */
+  clashPlayers(): CollectionQuery<ClashPlayerEntity> {
+    return this.client.lol.clash.playersByPuuid(this.puuid, this.region)
+  }
+
+  /** Ranked league entries in every queue. */
+  leagueEntries(): CollectionQuery<LeagueEntryEntity> {
+    return this.client.lol.league.byPuuid(this.puuid, this.region)
+  }
+
   /** Total champion mastery score. */
   masteryScore(): SingleQuery<ValueResult<number>> {
     return this.client.lol.mastery.score(this.puuid, this.region)
-  }
-
-  /**
-   * Ids of recent matches.
-   *
-   * @param query - Optional filters (count, queue, type, time range…).
-   */
-  matchIds(query?: MatchIdsQuery): CollectionQuery<string> {
-    return this.client.lol.match.idsByPuuid(this.puuid, regionToRegionGroup(this.region), query)
   }
 
   /**
@@ -101,12 +98,12 @@ export class SummonerRef extends SingleQuery<SummonerEntity> {
   }
 
   /**
-   * Stream match ids page by page.
+   * Ids of recent matches.
    *
-   * @param options - Paging options (start offset, page size, max items…).
+   * @param query - Optional filters (count, queue, type, time range…).
    */
-  streamMatchIds(options?: MatchStreamOptions): Paginator<string> {
-    return this.client.lol.match.streamIds(this.puuid, regionToRegionGroup(this.region), options)
+  matchIds(query?: MatchIdsQuery): CollectionQuery<string> {
+    return this.client.lol.match.idsByPuuid(this.puuid, regionToRegionGroup(this.region), query)
   }
 
   /**
@@ -122,18 +119,21 @@ export class SummonerRef extends SingleQuery<SummonerEntity> {
     )
   }
 
-  /** The live game, or `null` if not currently in one. */
-  activeGame(): SingleQuery<CurrentGameEntity | null> {
-    return this.client.lol.spectator.active(this.puuid, this.region)
+  /**
+   * Stream match ids page by page.
+   *
+   * @param options - Paging options (start offset, page size, max items…).
+   */
+  streamMatchIds(options?: MatchStreamOptions): Paginator<string> {
+    return this.client.lol.match.streamIds(this.puuid, regionToRegionGroup(this.region), options)
   }
 
-  /** Active Clash registrations. */
-  clashPlayers(): CollectionQuery<ClashPlayerEntity> {
-    return this.client.lol.clash.playersByPuuid(this.puuid, this.region)
-  }
-
-  /** Challenge progress. */
-  challenges(): SingleQuery<PlayerChallengesEntity> {
-    return this.client.lol.challenges.player(this.puuid, this.region)
+  /**
+   * Highest champion masteries.
+   *
+   * @param count - How many top entries to return.
+   */
+  topChampionMasteries(count?: number): CollectionQuery<ChampionMasteryEntity> {
+    return this.client.lol.mastery.top(this.puuid, this.region, count)
   }
 }

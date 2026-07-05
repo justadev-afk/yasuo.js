@@ -44,16 +44,21 @@ export class LolClashNamespace extends BaseNamespace {
   }
 
   /**
-   * Active and upcoming Clash tournaments.
+   * A Clash tournament by id.
    *
+   * @param tournamentId - The tournament id.
    * @param region - The platform region.
    */
-  tournaments(region: Region): CollectionQuery<ClashTournamentEntity> {
-    return this.many(
+  tournamentById(
+    tournamentId: number | string,
+    region: Region,
+  ): SingleQuery<ClashTournamentEntity> {
+    return this.single(
       ClashTournamentEntity,
       region,
-      LOL_ENDPOINTS.clashTournaments,
+      LOL_ENDPOINTS.clashTournamentById,
       this.regionContext(region),
+      { pathParams: { tournamentId } },
     )
   }
 
@@ -74,21 +79,16 @@ export class LolClashNamespace extends BaseNamespace {
   }
 
   /**
-   * A Clash tournament by id.
+   * Active and upcoming Clash tournaments.
    *
-   * @param tournamentId - The tournament id.
    * @param region - The platform region.
    */
-  tournamentById(
-    tournamentId: number | string,
-    region: Region,
-  ): SingleQuery<ClashTournamentEntity> {
-    return this.single(
+  tournaments(region: Region): CollectionQuery<ClashTournamentEntity> {
+    return this.many(
       ClashTournamentEntity,
       region,
-      LOL_ENDPOINTS.clashTournamentById,
+      LOL_ENDPOINTS.clashTournaments,
       this.regionContext(region),
-      { pathParams: { tournamentId } },
     )
   }
 }

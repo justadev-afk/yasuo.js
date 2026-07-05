@@ -32,17 +32,6 @@ export class LolChallengesNamespace extends BaseNamespace {
   }
 
   /**
-   * The percentile distributions of every challenge, keyed by challenge id then
-   * tier. The raw payload is boxed in a {@link ValueResult} — read it from
-   * `.value`.
-   *
-   * @param region - The platform region.
-   */
-  percentiles(region: Region): SingleQuery<ValueResult<AllChallengePercentilesDTO>> {
-    return this.scalar<AllChallengePercentilesDTO>(region, LOL_ENDPOINTS.challengesPercentiles)
-  }
-
-  /**
    * The configuration of a single challenge.
    *
    * @param challengeId - The challenge id.
@@ -76,6 +65,17 @@ export class LolChallengesNamespace extends BaseNamespace {
       pathParams: { challengeId, level },
       query: { limit },
     })
+  }
+
+  /**
+   * The percentile distributions of every challenge, keyed by challenge id then
+   * tier. The raw payload is boxed in a {@link ValueResult} — read it from
+   * `.value`.
+   *
+   * @param region - The platform region.
+   */
+  percentiles(region: Region): SingleQuery<ValueResult<AllChallengePercentilesDTO>> {
+    return this.scalar<AllChallengePercentilesDTO>(region, LOL_ENDPOINTS.challengesPercentiles)
   }
 
   /**

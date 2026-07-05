@@ -16,40 +16,6 @@ const DEFAULT_PAGE_SIZE = 100
  */
 export class TftMatchNamespace extends BaseNamespace {
   /**
-   * A page of TFT match ids for a player.
-   *
-   * @param puuid - The player's PUUID.
-   * @param regionGroup - The regional routing value.
-   * @param query - Optional filters (count, time range…).
-   */
-  idsByPuuid(
-    puuid: string,
-    regionGroup: RegionGroup,
-    query?: TftMatchIdsQuery,
-  ): CollectionQuery<string> {
-    return this.scalarMany<string>(regionGroup, TFT_ENDPOINTS.matchIdsByPuuid, {
-      pathParams: { puuid },
-      query: query as QueryParams | undefined,
-    })
-  }
-
-  /**
-   * A full TFT match by id.
-   *
-   * @param matchId - The match id.
-   * @param regionGroup - The regional routing value.
-   */
-  get(matchId: string, regionGroup: RegionGroup): SingleQuery<TftMatchEntity> {
-    return this.single(
-      TftMatchEntity,
-      regionGroup,
-      TFT_ENDPOINTS.matchById,
-      this.groupContext(regionGroup),
-      { pathParams: { matchId } },
-    )
-  }
-
-  /**
    * A player's recent TFT matches, fetched in full (one request per match).
    *
    * @param puuid - The player's PUUID.
@@ -83,6 +49,40 @@ export class TftMatchNamespace extends BaseNamespace {
         return Collection.create<TftMatchEntity>([], failed.http, failed.error)
       }
       return Collection.create(matches, matches.at(-1)?.http ?? ids.http)
+    })
+  }
+
+  /**
+   * A full TFT match by id.
+   *
+   * @param matchId - The match id.
+   * @param regionGroup - The regional routing value.
+   */
+  get(matchId: string, regionGroup: RegionGroup): SingleQuery<TftMatchEntity> {
+    return this.single(
+      TftMatchEntity,
+      regionGroup,
+      TFT_ENDPOINTS.matchById,
+      this.groupContext(regionGroup),
+      { pathParams: { matchId } },
+    )
+  }
+
+  /**
+   * A page of TFT match ids for a player.
+   *
+   * @param puuid - The player's PUUID.
+   * @param regionGroup - The regional routing value.
+   * @param query - Optional filters (count, time range…).
+   */
+  idsByPuuid(
+    puuid: string,
+    regionGroup: RegionGroup,
+    query?: TftMatchIdsQuery,
+  ): CollectionQuery<string> {
+    return this.scalarMany<string>(regionGroup, TFT_ENDPOINTS.matchIdsByPuuid, {
+      pathParams: { puuid },
+      query: query as QueryParams | undefined,
     })
   }
 

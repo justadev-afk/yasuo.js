@@ -23,29 +23,19 @@ export class TftSummonerEntity extends Entity<SummonerDTO> {
     return this.context.region as Region
   }
 
-  private ref(): TftSummonerRef {
-    return new TftSummonerRef(this.context.client, this.puuid, this.region, (exec) =>
-      exec.throw && this.error ? Promise.reject(this.error) : Promise.resolve(this),
-    )
-  }
-
   /** Resolve the underlying Riot account. */
   account(): SingleQuery<AccountEntity> {
     return this.ref().account()
   }
 
+  /** This summoner's live TFT game, or `null` if they are not in one. */
+  activeGame(): SingleQuery<CurrentGameEntity | null> {
+    return this.ref().activeGame()
+  }
+
   /** This summoner's TFT ranked league entries. */
   leagueEntries(): CollectionQuery<TftLeagueEntryEntity> {
     return this.ref().leagueEntries()
-  }
-
-  /**
-   * Ids of this summoner's recent TFT matches.
-   *
-   * @param query - Optional filters (count, time range…).
-   */
-  matchIds(query?: TftMatchIdsQuery): CollectionQuery<string> {
-    return this.ref().matchIds(query)
   }
 
   /**
@@ -58,6 +48,15 @@ export class TftSummonerEntity extends Entity<SummonerDTO> {
   }
 
   /**
+   * Ids of this summoner's recent TFT matches.
+   *
+   * @param query - Optional filters (count, time range…).
+   */
+  matchIds(query?: TftMatchIdsQuery): CollectionQuery<string> {
+    return this.ref().matchIds(query)
+  }
+
+  /**
    * Stream this summoner's entire TFT match history as full match entities.
    *
    * @param options - Paging options (start offset, page size, max items…).
@@ -66,8 +65,9 @@ export class TftSummonerEntity extends Entity<SummonerDTO> {
     return this.ref().streamMatches(options)
   }
 
-  /** This summoner's live TFT game, or `null` if they are not in one. */
-  activeGame(): SingleQuery<CurrentGameEntity | null> {
-    return this.ref().activeGame()
+  private ref(): TftSummonerRef {
+    return new TftSummonerRef(this.context.client, this.puuid, this.region, (exec) =>
+      exec.throw && this.error ? Promise.reject(this.error) : Promise.resolve(this),
+    )
   }
 }

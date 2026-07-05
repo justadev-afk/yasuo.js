@@ -28,20 +28,20 @@ export interface ApiErrorInit {
  * `catch (e) { if (e instanceof ApiError) ... }` matches every failed request.
  */
 export class ApiError extends YasuoError {
-  /** HTTP status code returned by Riot. */
-  readonly status: number
-  /** Final request URL (query string included). */
-  readonly url: string
-  /** Rate-limit method key of the endpoint that failed. */
-  readonly method: string
-  /** Rate-limit information parsed from the response headers. */
-  readonly rateLimits: RateLimits
   /** Parsed response body, when Riot returned one. */
   readonly body: unknown
   /** Raw, lower-cased response headers. */
   readonly headers: Readonly<Record<string, string>>
+  /** Rate-limit method key of the endpoint that failed. */
+  readonly method: string
+  /** Rate-limit information parsed from the response headers. */
+  readonly rateLimits: RateLimits
   /** The original HTTP response, or `null` for transport/network failures. */
   readonly response: HttpResponse | null
+  /** HTTP status code returned by Riot. */
+  readonly status: number
+  /** Final request URL (query string included). */
+  readonly url: string
 
   constructor(init: ApiErrorInit, message?: string) {
     super(message ?? `Riot API request failed with status ${init.status} (${init.url})`)

@@ -23,74 +23,10 @@ const DEFAULT_LANGUAGE = 'en_US'
  * Reached via `yasuo.dataDragon`.
  */
 export class DataDragonNamespace {
-  private versionsCache?: Promise<string[]>
   private readonly championListCache = new Map<string, Promise<DDragonChampionListDTO>>()
+  private versionsCache?: Promise<string[]>
 
   constructor(private readonly fetchImpl: typeof fetch = fetch) {}
-
-  private async request<T>(host: DataDragonHost, path: string): Promise<T> {
-    const url = `${host}/${path}`
-    const response = await this.fetchImpl(url)
-    if (!response.ok) {
-      throw new Error(
-        `Data Dragon request failed (${response.status} ${response.statusText}): ${url}`,
-      )
-    }
-    return (await response.json()) as T
-  }
-
-  /** All available Data Dragon versions, newest first. Memoised. */
-  versions(): Promise<string[]> {
-    this.versionsCache ??= this.request<string[]>(DataDragonHost.DDRAGON, 'api/versions.json')
-    return this.versionsCache
-  }
-
-  /** The latest Data Dragon version. */
-  private async latestVersion(): Promise<string> {
-    const versions = await this.versions()
-    const latest = versions[0]
-    if (!latest) {
-      throw new Error('Data Dragon returned no versions')
-    }
-    return latest
-  }
-
-  /** All available locales. */
-  languages(): Promise<string[]> {
-    return this.request<string[]>(DataDragonHost.DDRAGON, 'cdn/languages.json')
-  }
-
-  /**
-   * Get the realm descriptor for a server (e.g. `na`, `euw`, `kr`).
-   *
-   * @param server - The realm/server code.
-   */
-  realm(server: string): Promise<DDragonRealmDTO> {
-    return this.request<DDragonRealmDTO>(DataDragonHost.DDRAGON, `realms/${server}.json`)
-  }
-
-  /**
-   * Get the full champion list.
-   *
-   * @param language - Locale. Defaults to `en_US`.
-   */
-  async champions(language: string = DEFAULT_LANGUAGE): Promise<DDragonChampionListDTO> {
-    const version = await this.latestVersion()
-    return this.cachedChampionList(version, language)
-  }
-
-  private cachedChampionList(version: string, language: string): Promise<DDragonChampionListDTO> {
-    const key = `${version}:${language}`
-    let cached = this.championListCache.get(key)
-    if (!cached) {
-      cached = this.request<DDragonChampionListDTO>(
-        DataDragonHost.DDRAGON,
-        `cdn/${version}/data/${language}/champion.json`,
-      )
-      this.championListCache.set(key, cached)
-    }
-    return cached
-  }
 
   /**
    * Get detailed data for a champion by its Data Dragon id (e.g. `Aatrox`).
@@ -131,26 +67,13 @@ export class DataDragonNamespace {
   }
 
   /**
-   * Get the reforged rune paths.
+   * Get the full champion list.
    *
    * @param language - Locale. Defaults to `en_US`.
    */
-  async runesReforged(language: string = DEFAULT_LANGUAGE): Promise<DDragonRunesReforgedDTO[]> {
+  async champions(language: string = DEFAULT_LANGUAGE): Promise<DDragonChampionListDTO> {
     const version = await this.latestVersion()
-    return this.request<DDragonRunesReforgedDTO[]>(
-      DataDragonHost.DDRAGON,
-      `cdn/${version}/data/${language}/runesReforged.json`,
-    )
-  }
-
-  /** Get the static queues reference list. */
-  queues(): Promise<DDragonQueueDTO[]> {
-    return this.request<DDragonQueueDTO[]>(DataDragonHost.STATIC, 'docs/lol/queues.json')
-  }
-
-  /** Get the static maps reference list. */
-  maps(): Promise<DDragonMapDTO[]> {
-    return this.request<DDragonMapDTO[]>(DataDragonHost.STATIC, 'docs/lol/maps.json')
+    return this.cachedChampionList(version, language)
   }
 
   /** Get the static game-modes reference list. */
@@ -163,8 +86,85 @@ export class DataDragonNamespace {
     return this.request<DDragonGameTypeDTO[]>(DataDragonHost.STATIC, 'docs/lol/gameTypes.json')
   }
 
+  /** All available locales. */
+  languages(): Promise<string[]> {
+    return this.request<string[]>(DataDragonHost.DDRAGON, 'cdn/languages.json')
+  }
+
+  /** Get the static maps reference list. */
+  maps(): Promise<DDragonMapDTO[]> {
+    return this.request<DDragonMapDTO[]>(DataDragonHost.STATIC, 'docs/lol/maps.json')
+  }
+
+  /** Get the static queues reference list. */
+  queues(): Promise<DDragonQueueDTO[]> {
+    return this.request<DDragonQueueDTO[]>(DataDragonHost.STATIC, 'docs/lol/queues.json')
+  }
+
+  /**
+   * Get the realm descriptor for a server (e.g. `na`, `euw`, `kr`).
+   *
+   * @param server - The realm/server code.
+   */
+  realm(server: string): Promise<DDragonRealmDTO> {
+    return this.request<DDragonRealmDTO>(DataDragonHost.DDRAGON, `realms/${server}.json`)
+  }
+
+  /**
+   * Get the reforged rune paths.
+   *
+   * @param language - Locale. Defaults to `en_US`.
+   */
+  async runesReforged(language: string = DEFAULT_LANGUAGE): Promise<DDragonRunesReforgedDTO[]> {
+    const version = await this.latestVersion()
+    return this.request<DDragonRunesReforgedDTO[]>(
+      DataDragonHost.DDRAGON,
+      `cdn/${version}/data/${language}/runesReforged.json`,
+    )
+  }
+
   /** Get the static seasons reference list. */
   seasons(): Promise<DDragonSeasonDTO[]> {
     return this.request<DDragonSeasonDTO[]>(DataDragonHost.STATIC, 'docs/lol/seasons.json')
+  }
+
+  /** All available Data Dragon versions, newest first. Memoised. */
+  versions(): Promise<string[]> {
+    this.versionsCache ??= this.request<string[]>(DataDragonHost.DDRAGON, 'api/versions.json')
+    return this.versionsCache
+  }
+
+  private cachedChampionList(version: string, language: string): Promise<DDragonChampionListDTO> {
+    const key = `${version}:${language}`
+    let cached = this.championListCache.get(key)
+    if (!cached) {
+      cached = this.request<DDragonChampionListDTO>(
+        DataDragonHost.DDRAGON,
+        `cdn/${version}/data/${language}/champion.json`,
+      )
+      this.championListCache.set(key, cached)
+    }
+    return cached
+  }
+
+  /** The latest Data Dragon version. */
+  private async latestVersion(): Promise<string> {
+    const versions = await this.versions()
+    const latest = versions[0]
+    if (!latest) {
+      throw new Error('Data Dragon returned no versions')
+    }
+    return latest
+  }
+
+  private async request<T>(host: DataDragonHost, path: string): Promise<T> {
+    const url = `${host}/${path}`
+    const response = await this.fetchImpl(url)
+    if (!response.ok) {
+      throw new Error(
+        `Data Dragon request failed (${response.status} ${response.statusText}): ${url}`,
+      )
+    }
+    return (await response.json()) as T
   }
 }

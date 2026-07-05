@@ -18,23 +18,13 @@ export interface MatchEntity extends MatchDTO {}
  * ```
  */
 export class MatchEntity extends Entity<MatchDTO> {
-  private get regionGroup(): RegionGroup {
-    return this.context.regionGroup as RegionGroup
-  }
-
   /** The match id (`metadata.matchId`). */
   get id(): string {
     return this.metadata.matchId
   }
 
-  /** The timeline for this match (call `.execute()` to fetch). */
-  timeline(): SingleQuery<MatchTimelineEntity> {
-    return this.context.client.lol.match.timeline(this.id, this.regionGroup)
-  }
-
-  /** The winning team, or `null` if it cannot be determined. */
-  winningTeam(): MatchTeamDTO | null {
-    return this.info.teams.find((team) => team.win) ?? null
+  private get regionGroup(): RegionGroup {
+    return this.context.regionGroup as RegionGroup
   }
 
   /**
@@ -44,6 +34,11 @@ export class MatchEntity extends Entity<MatchDTO> {
    */
   participant(puuid: string): MatchParticipantDTO | undefined {
     return this.info.participants.find((participant) => participant.puuid === puuid)
+  }
+
+  /** The {@link Region} this match was played on, from `info.platformId`. */
+  platformRegion(): Region | null {
+    return regionFromPlatformId(this.info.platformId)
   }
 
   /**
@@ -64,8 +59,13 @@ export class MatchEntity extends Entity<MatchDTO> {
     )
   }
 
-  /** The {@link Region} this match was played on, from `info.platformId`. */
-  platformRegion(): Region | null {
-    return regionFromPlatformId(this.info.platformId)
+  /** The timeline for this match (call `.execute()` to fetch). */
+  timeline(): SingleQuery<MatchTimelineEntity> {
+    return this.context.client.lol.match.timeline(this.id, this.regionGroup)
+  }
+
+  /** The winning team, or `null` if it cannot be determined. */
+  winningTeam(): MatchTeamDTO | null {
+    return this.info.teams.find((team) => team.win) ?? null
   }
 }

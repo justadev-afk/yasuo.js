@@ -12,6 +12,48 @@ import { BaseNamespace } from '../base-namespace'
  */
 export class RiotAccountNamespace extends BaseNamespace {
   /**
+   * A player's active region for a game.
+   *
+   * @param game - The game (`lol` or `tft`).
+   * @param puuid - The player's PUUID.
+   * @param regionGroup - Account routing value.
+   */
+  activeRegion(
+    game: Game,
+    puuid: string,
+    regionGroup: AccountRegionGroup,
+  ): SingleQuery<AccountRegionEntity> {
+    return this.single(
+      AccountRegionEntity,
+      regionGroup,
+      RIOT_ENDPOINTS.accountActiveRegion,
+      this.groupContext(regionGroup),
+      { pathParams: { game, puuid } },
+    )
+  }
+
+  /**
+   * A player's active shard for a game.
+   *
+   * @param game - The game (`lol`, `tft`, …).
+   * @param puuid - The player's PUUID.
+   * @param regionGroup - Account routing value.
+   */
+  activeShard(
+    game: Game,
+    puuid: string,
+    regionGroup: AccountRegionGroup,
+  ): SingleQuery<ActiveShardEntity> {
+    return this.single(
+      ActiveShardEntity,
+      regionGroup,
+      RIOT_ENDPOINTS.accountActiveShard,
+      this.groupContext(regionGroup),
+      { pathParams: { game, puuid } },
+    )
+  }
+
+  /**
    * An account by PUUID.
    *
    * @param puuid - The player's PUUID.
@@ -45,48 +87,6 @@ export class RiotAccountNamespace extends BaseNamespace {
       RIOT_ENDPOINTS.accountByRiotId,
       this.groupContext(regionGroup),
       { pathParams: { gameName, tagLine } },
-    )
-  }
-
-  /**
-   * A player's active shard for a game.
-   *
-   * @param game - The game (`lol`, `tft`, …).
-   * @param puuid - The player's PUUID.
-   * @param regionGroup - Account routing value.
-   */
-  activeShard(
-    game: Game,
-    puuid: string,
-    regionGroup: AccountRegionGroup,
-  ): SingleQuery<ActiveShardEntity> {
-    return this.single(
-      ActiveShardEntity,
-      regionGroup,
-      RIOT_ENDPOINTS.accountActiveShard,
-      this.groupContext(regionGroup),
-      { pathParams: { game, puuid } },
-    )
-  }
-
-  /**
-   * A player's active region for a game.
-   *
-   * @param game - The game (`lol` or `tft`).
-   * @param puuid - The player's PUUID.
-   * @param regionGroup - Account routing value.
-   */
-  activeRegion(
-    game: Game,
-    puuid: string,
-    regionGroup: AccountRegionGroup,
-  ): SingleQuery<AccountRegionEntity> {
-    return this.single(
-      AccountRegionEntity,
-      regionGroup,
-      RIOT_ENDPOINTS.accountActiveRegion,
-      this.groupContext(regionGroup),
-      { pathParams: { game, puuid } },
     )
   }
 }

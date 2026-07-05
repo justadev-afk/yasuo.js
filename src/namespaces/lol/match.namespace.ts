@@ -17,58 +17,6 @@ const DEFAULT_PAGE_SIZE = 100
  */
 export class LolMatchNamespace extends BaseNamespace {
   /**
-   * A full match by id.
-   *
-   * @param matchId - The match id, e.g. `KR_1234567890`.
-   * @param regionGroup - The regional routing value.
-   */
-  get(matchId: string, regionGroup: RegionGroup): SingleQuery<MatchEntity> {
-    return this.single(
-      MatchEntity,
-      regionGroup,
-      LOL_ENDPOINTS.matchById,
-      this.groupContext(regionGroup),
-      {
-        pathParams: { matchId },
-      },
-    )
-  }
-
-  /**
-   * A match timeline by id.
-   *
-   * @param matchId - The match id.
-   * @param regionGroup - The regional routing value.
-   */
-  timeline(matchId: string, regionGroup: RegionGroup): SingleQuery<MatchTimelineEntity> {
-    return this.single(
-      MatchTimelineEntity,
-      regionGroup,
-      LOL_ENDPOINTS.matchTimeline,
-      this.groupContext(regionGroup),
-      { pathParams: { matchId } },
-    )
-  }
-
-  /**
-   * A page of match ids for a player.
-   *
-   * @param puuid - The player's PUUID.
-   * @param regionGroup - The regional routing value.
-   * @param query - Optional filters (count, queue, type, time range…).
-   */
-  idsByPuuid(
-    puuid: string,
-    regionGroup: RegionGroup,
-    query?: MatchIdsQuery,
-  ): CollectionQuery<string> {
-    return this.scalarMany<string>(regionGroup, LOL_ENDPOINTS.matchIdsByPuuid, {
-      pathParams: { puuid },
-      query: query as QueryParams | undefined,
-    })
-  }
-
-  /**
    * A player's recent matches, fetched in full (one request per match).
    *
    * @param puuid - The player's PUUID.
@@ -102,6 +50,42 @@ export class LolMatchNamespace extends BaseNamespace {
         return Collection.create<MatchEntity>([], failed.http, failed.error)
       }
       return Collection.create(matches, matches.at(-1)?.http ?? ids.http)
+    })
+  }
+
+  /**
+   * A full match by id.
+   *
+   * @param matchId - The match id, e.g. `KR_1234567890`.
+   * @param regionGroup - The regional routing value.
+   */
+  get(matchId: string, regionGroup: RegionGroup): SingleQuery<MatchEntity> {
+    return this.single(
+      MatchEntity,
+      regionGroup,
+      LOL_ENDPOINTS.matchById,
+      this.groupContext(regionGroup),
+      {
+        pathParams: { matchId },
+      },
+    )
+  }
+
+  /**
+   * A page of match ids for a player.
+   *
+   * @param puuid - The player's PUUID.
+   * @param regionGroup - The regional routing value.
+   * @param query - Optional filters (count, queue, type, time range…).
+   */
+  idsByPuuid(
+    puuid: string,
+    regionGroup: RegionGroup,
+    query?: MatchIdsQuery,
+  ): CollectionQuery<string> {
+    return this.scalarMany<string>(regionGroup, LOL_ENDPOINTS.matchIdsByPuuid, {
+      pathParams: { puuid },
+      query: query as QueryParams | undefined,
     })
   }
 
@@ -160,6 +144,22 @@ export class LolMatchNamespace extends BaseNamespace {
       },
       nextCursor: (cursor, page) => (page.items.length < pageSize ? null : cursor + pageSize),
     })
+  }
+
+  /**
+   * A match timeline by id.
+   *
+   * @param matchId - The match id.
+   * @param regionGroup - The regional routing value.
+   */
+  timeline(matchId: string, regionGroup: RegionGroup): SingleQuery<MatchTimelineEntity> {
+    return this.single(
+      MatchTimelineEntity,
+      regionGroup,
+      LOL_ENDPOINTS.matchTimeline,
+      this.groupContext(regionGroup),
+      { pathParams: { matchId } },
+    )
   }
 
   private pageQuery(cursor: number, pageSize: number, options: MatchStreamOptions): QueryParams {

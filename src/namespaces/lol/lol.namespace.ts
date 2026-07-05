@@ -16,24 +16,24 @@ import { LolSummonerNamespace } from './summoner.namespace'
  * Reached via `yasuo.lol` — e.g. `yasuo.lol.summoner`, `yasuo.lol.match`.
  */
 export class LolNamespace {
-  /** SUMMONER-V4. */
-  readonly summoner: LolSummonerNamespace
+  /** LOL-CHALLENGES-V1. */
+  readonly challenges: LolChallengesNamespace
+  /** CHAMPION-V3 (champion rotation). */
+  readonly champion: LolChampionNamespace
+  /** CLASH-V1. */
+  readonly clash: LolClashNamespace
   /** LEAGUE-V4. */
   readonly league: LolLeagueNamespace
   /** CHAMPION-MASTERY-V4. */
   readonly mastery: LolMasteryNamespace
-  /** CHAMPION-V3 (champion rotation). */
-  readonly champion: LolChampionNamespace
   /** MATCH-V5. */
   readonly match: LolMatchNamespace
   /** SPECTATOR-V5. */
   readonly spectator: LolSpectatorNamespace
   /** LOL-STATUS-V4. */
   readonly status: LolStatusNamespace
-  /** CLASH-V1. */
-  readonly clash: LolClashNamespace
-  /** LOL-CHALLENGES-V1. */
-  readonly challenges: LolChallengesNamespace
+  /** SUMMONER-V4. */
+  readonly summoner: LolSummonerNamespace
 
   constructor(executor: RequestExecutor, client: Yasuo) {
     this.summoner = new LolSummonerNamespace(executor, client)

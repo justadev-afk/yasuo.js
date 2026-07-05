@@ -11,14 +11,14 @@ import { TftSummonerNamespace } from './tft-summoner.namespace'
  * Reached via `yasuo.tft` — e.g. `yasuo.tft.summoner`, `yasuo.tft.match`.
  */
 export class TftNamespace {
-  /** TFT-SUMMONER-V1. */
-  readonly summoner: TftSummonerNamespace
   /** TFT-LEAGUE-V1. */
   readonly league: TftLeagueNamespace
   /** TFT-MATCH-V1. */
   readonly match: TftMatchNamespace
   /** SPECTATOR-TFT-V5. */
   readonly spectator: TftSpectatorNamespace
+  /** TFT-SUMMONER-V1. */
+  readonly summoner: TftSummonerNamespace
 
   constructor(executor: RequestExecutor, client: Yasuo) {
     this.summoner = new TftSummonerNamespace(executor, client)

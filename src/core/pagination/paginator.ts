@@ -48,6 +48,14 @@ export interface PaginatorConfig<T> {
 export class Paginator<T> implements AsyncIterable<T> {
   constructor(private readonly config: PaginatorConfig<T>) {}
 
+  /** Return the first item, or `null` if the sequence is empty. */
+  async first(): Promise<T | null> {
+    for await (const item of this) {
+      return item
+    }
+    return null
+  }
+
   /**
    * Iterate over whole pages, exposing each page's {@link Page.meta}.
    */
@@ -70,15 +78,6 @@ export class Paginator<T> implements AsyncIterable<T> {
     }
   }
 
-  /** Iterate over individual items, transparently fetching pages as needed. */
-  async *[Symbol.asyncIterator](): AsyncGenerator<T, void, void> {
-    for await (const page of this.pages()) {
-      for (const item of page.items) {
-        yield item
-      }
-    }
-  }
-
   /**
    * Eagerly collect items into an array.
    *
@@ -95,11 +94,12 @@ export class Paginator<T> implements AsyncIterable<T> {
     return out
   }
 
-  /** Return the first item, or `null` if the sequence is empty. */
-  async first(): Promise<T | null> {
-    for await (const item of this) {
-      return item
+  /** Iterate over individual items, transparently fetching pages as needed. */
+  async *[Symbol.asyncIterator](): AsyncGenerator<T, void, void> {
+    for await (const page of this.pages()) {
+      for (const item of page.items) {
+        yield item
+      }
     }
-    return null
   }
 }

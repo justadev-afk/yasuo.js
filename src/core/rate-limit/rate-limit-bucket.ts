@@ -12,33 +12,17 @@ const MS_PER_SECOND = 1000
  * slot and no penalty is active.
  */
 export class RateLimitBucket {
-  private windows = new Map<number, SlidingWindow>()
+  /** Whether the bucket has learned any windows yet. */
+  get configured(): boolean {
+    return this.windows.size > 0
+  }
+
   private blockedUntil = 0
-
-  /** Milliseconds until the bucket can accept another request. */
-  timeUntilAvailable(now: number): number {
-    let wait = Math.max(0, this.blockedUntil - now)
-    for (const window of this.windows.values()) {
-      wait = Math.max(wait, window.timeUntilAvailable(now))
-    }
-    return wait
-  }
-
-  /** Record a request against every window in the bucket. */
-  record(now: number): void {
-    for (const window of this.windows.values()) {
-      window.record(now)
-    }
-  }
+  private windows = new Map<number, SlidingWindow>()
 
   /** Block the bucket until `until` (epoch ms) — used to honour `retry-after`. */
   blockUntil(until: number): void {
     this.blockedUntil = Math.max(this.blockedUntil, until)
-  }
-
-  /** Whether the bucket has learned any windows yet. */
-  get configured(): boolean {
-    return this.windows.size > 0
   }
 
   /**
@@ -71,5 +55,21 @@ export class RateLimitBucket {
         this.windows.delete(intervalMs)
       }
     }
+  }
+
+  /** Record a request against every window in the bucket. */
+  record(now: number): void {
+    for (const window of this.windows.values()) {
+      window.record(now)
+    }
+  }
+
+  /** Milliseconds until the bucket can accept another request. */
+  timeUntilAvailable(now: number): number {
+    let wait = Math.max(0, this.blockedUntil - now)
+    for (const window of this.windows.values()) {
+      wait = Math.max(wait, window.timeUntilAvailable(now))
+    }
+    return wait
   }
 }

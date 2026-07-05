@@ -21,16 +21,16 @@ export class ChampionMasteryEntity extends Entity<ChampionMasteryDTO> {
     return this.context.region as Region
   }
 
-  /** Resolve the summoner this mastery belongs to (chainable). */
-  summoner(): SummonerRef {
-    return this.context.client.lol.summoner.byPuuid(this.puuid, this.region)
-  }
-
   /**
    * Resolve the champion's static Data Dragon data, or `null` if the id is not
    * present in the latest patch.
    */
   champion(): Promise<DDragonChampionSummaryDTO | null> {
     return this.context.client.dataDragon.championById(this.championId)
+  }
+
+  /** Resolve the summoner this mastery belongs to (chainable). */
+  summoner(): SummonerRef {
+    return this.context.client.lol.summoner.byPuuid(this.puuid, this.region)
   }
 }

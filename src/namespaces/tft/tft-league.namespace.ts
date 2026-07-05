@@ -16,6 +16,22 @@ const DEFAULT_START_PAGE = 1
  */
 export class TftLeagueNamespace extends BaseNamespace {
   /**
+   * A TFT league by id.
+   *
+   * @param leagueId - The league id.
+   * @param region - The platform region.
+   */
+  byId(leagueId: string, region: Region): SingleQuery<TftLeagueListEntity> {
+    return this.single(
+      TftLeagueListEntity,
+      region,
+      TFT_ENDPOINTS.leagueById,
+      this.regionContext(region),
+      { pathParams: { leagueId } },
+    )
+  }
+
+  /**
    * A player's TFT ranked entries by PUUID.
    *
    * @param puuid - The player's PUUID.
@@ -49,6 +65,15 @@ export class TftLeagueNamespace extends BaseNamespace {
   }
 
   /**
+   * The TFT Challenger league.
+   *
+   * @param region - The platform region.
+   */
+  challenger(region: Region): SingleQuery<TftLeagueListEntity> {
+    return this.leagueList(TFT_ENDPOINTS.leagueChallenger, region)
+  }
+
+  /**
    * A page of TFT ranked entries for a tier/division.
    *
    * @param tier - Ranked tier.
@@ -72,15 +97,6 @@ export class TftLeagueNamespace extends BaseNamespace {
   }
 
   /**
-   * The TFT Challenger league.
-   *
-   * @param region - The platform region.
-   */
-  challenger(region: Region): SingleQuery<TftLeagueListEntity> {
-    return this.leagueList(TFT_ENDPOINTS.leagueChallenger, region)
-  }
-
-  /**
    * The TFT Grandmaster league.
    *
    * @param region - The platform region.
@@ -96,22 +112,6 @@ export class TftLeagueNamespace extends BaseNamespace {
    */
   master(region: Region): SingleQuery<TftLeagueListEntity> {
     return this.leagueList(TFT_ENDPOINTS.leagueMaster, region)
-  }
-
-  /**
-   * A TFT league by id.
-   *
-   * @param leagueId - The league id.
-   * @param region - The platform region.
-   */
-  byId(leagueId: string, region: Region): SingleQuery<TftLeagueListEntity> {
-    return this.single(
-      TftLeagueListEntity,
-      region,
-      TFT_ENDPOINTS.leagueById,
-      this.regionContext(region),
-      { pathParams: { leagueId } },
-    )
   }
 
   /**

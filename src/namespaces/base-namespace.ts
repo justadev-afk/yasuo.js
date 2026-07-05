@@ -55,50 +55,9 @@ export abstract class BaseNamespace {
     return this
   }
 
-  /**
-   * Dispatch a request through the shared executor, injecting this service's
-   * middleware. Every namespace request goes through here so per-service
-   * middleware is always applied.
-   */
-  protected request<T>(
-    routing: string,
-    endpoint: Endpoint,
-    options?: RequestOptions,
-  ): Promise<Fetched<T>> {
-    return this.executor.request<T>(routing, endpoint, {
-      ...options,
-      middleware: this.middlewares,
-    })
-  }
-
-  /** Build an {@link EntityContext} for a platform-region-scoped resource. */
-  protected regionContext(region: Region): EntityContext {
-    return { client: this.client, region, regionGroup: regionToRegionGroup(region) }
-  }
-
   /** Build an {@link EntityContext} for a region-group-scoped resource. */
   protected groupContext(regionGroup: RegionGroup): EntityContext {
     return { client: this.client, regionGroup }
-  }
-
-  /** A deferred request that resolves to a single entity. */
-  protected single<TData extends object, E extends Entity<TData>>(
-    Ctor: EntityConstructor<TData, E>,
-    routing: string,
-    endpoint: Endpoint,
-    context: EntityContext,
-    options?: RequestOptions,
-  ): SingleQuery<E> {
-    return new SingleQuery<E>((exec) =>
-      this.runResult<E>(
-        routing,
-        endpoint,
-        options,
-        exec,
-        (data, meta) => new Ctor(data as TData, meta, context),
-        (error, meta) => new Ctor({} as TData, meta, context, error),
-      ),
-    )
   }
 
   /** A deferred request that resolves to a {@link Collection} of entities. */
@@ -123,6 +82,55 @@ export abstract class BaseNamespace {
         (error, meta) => Collection.create<E>([], meta, error),
       ),
     )
+  }
+
+  /** Build an {@link EntityContext} for a platform-region-scoped resource. */
+  protected regionContext(region: Region): EntityContext {
+    return { client: this.client, region, regionGroup: regionToRegionGroup(region) }
+  }
+
+  /**
+   * Dispatch a request through the shared executor, injecting this service's
+   * middleware. Every namespace request goes through here so per-service
+   * middleware is always applied.
+   */
+  protected request<T>(
+    routing: string,
+    endpoint: Endpoint,
+    options?: RequestOptions,
+  ): Promise<Fetched<T>> {
+    return this.executor.request<T>(routing, endpoint, {
+      ...options,
+      middleware: this.middlewares,
+    })
+  }
+
+  /**
+   * Shared request→map plumbing behind every builder. Honours `{ raw }` (returns
+   * the untouched payload) and `{ throw }` (rethrows on failure). Otherwise it
+   * catches an {@link ApiError} into a failure result via `onFailure`, and
+   * rethrows anything else — a misuse such as `ApiKeyMissingError` always throws.
+   */
+  protected async runResult<R>(
+    routing: string,
+    endpoint: Endpoint,
+    options: RequestOptions | undefined,
+    exec: ExecuteOptions,
+    onSuccess: (data: unknown, meta: ResponseMeta) => R,
+    onFailure: (error: ApiError, meta: ResponseMeta) => R,
+  ): Promise<R | unknown> {
+    try {
+      const fetched = await this.request<unknown>(routing, endpoint, mergeSignal(options, exec))
+      return exec.raw ? fetched.data : onSuccess(fetched.data, fetched.meta)
+    } catch (error) {
+      if (!(error instanceof ApiError)) {
+        throw error
+      }
+      if (exec.throw) {
+        throw error
+      }
+      return exec.raw ? error.body : onFailure(error, metaFromError(error))
+    }
   }
 
   /** A deferred request that resolves to a boxed scalar {@link ValueResult}. */
@@ -161,32 +169,24 @@ export abstract class BaseNamespace {
     )
   }
 
-  /**
-   * Shared request→map plumbing behind every builder. Honours `{ raw }` (returns
-   * the untouched payload) and `{ throw }` (rethrows on failure). Otherwise it
-   * catches an {@link ApiError} into a failure result via `onFailure`, and
-   * rethrows anything else — a misuse such as `ApiKeyMissingError` always throws.
-   */
-  protected async runResult<R>(
+  /** A deferred request that resolves to a single entity. */
+  protected single<TData extends object, E extends Entity<TData>>(
+    Ctor: EntityConstructor<TData, E>,
     routing: string,
     endpoint: Endpoint,
-    options: RequestOptions | undefined,
-    exec: ExecuteOptions,
-    onSuccess: (data: unknown, meta: ResponseMeta) => R,
-    onFailure: (error: ApiError, meta: ResponseMeta) => R,
-  ): Promise<R | unknown> {
-    try {
-      const fetched = await this.request<unknown>(routing, endpoint, mergeSignal(options, exec))
-      return exec.raw ? fetched.data : onSuccess(fetched.data, fetched.meta)
-    } catch (error) {
-      if (!(error instanceof ApiError)) {
-        throw error
-      }
-      if (exec.throw) {
-        throw error
-      }
-      return exec.raw ? error.body : onFailure(error, metaFromError(error))
-    }
+    context: EntityContext,
+    options?: RequestOptions,
+  ): SingleQuery<E> {
+    return new SingleQuery<E>((exec) =>
+      this.runResult<E>(
+        routing,
+        endpoint,
+        options,
+        exec,
+        (data, meta) => new Ctor(data as TData, meta, context),
+        (error, meta) => new Ctor({} as TData, meta, context, error),
+      ),
+    )
   }
 }
 

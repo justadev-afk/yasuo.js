@@ -17,6 +17,22 @@ const DEFAULT_START_PAGE = 1
  */
 export class LolLeagueNamespace extends BaseNamespace {
   /**
+   * A league by its id.
+   *
+   * @param leagueId - The league id.
+   * @param region - The platform region.
+   */
+  byId(leagueId: string, region: Region): SingleQuery<LeagueListEntity> {
+    return this.single(
+      LeagueListEntity,
+      region,
+      LOL_ENDPOINTS.leagueById,
+      this.regionContext(region),
+      { pathParams: { leagueId } },
+    )
+  }
+
+  /**
    * All ranked entries for a player by PUUID.
    *
    * @param puuid - The player's PUUID.
@@ -47,6 +63,16 @@ export class LolLeagueNamespace extends BaseNamespace {
       this.regionContext(region),
       { pathParams: { summonerId } },
     )
+  }
+
+  /**
+   * The Challenger league for a queue.
+   *
+   * @param queue - Ranked queue.
+   * @param region - The platform region.
+   */
+  challenger(queue: RankedQueue, region: Region): SingleQuery<LeagueListEntity> {
+    return this.leagueList(LOL_ENDPOINTS.leagueChallenger, queue, region)
   }
 
   /**
@@ -101,6 +127,26 @@ export class LolLeagueNamespace extends BaseNamespace {
   }
 
   /**
+   * The Grandmaster league for a queue.
+   *
+   * @param queue - Ranked queue.
+   * @param region - The platform region.
+   */
+  grandmaster(queue: RankedQueue, region: Region): SingleQuery<LeagueListEntity> {
+    return this.leagueList(LOL_ENDPOINTS.leagueGrandmaster, queue, region)
+  }
+
+  /**
+   * The Master league for a queue.
+   *
+   * @param queue - Ranked queue.
+   * @param region - The platform region.
+   */
+  master(queue: RankedQueue, region: Region): SingleQuery<LeagueListEntity> {
+    return this.leagueList(LOL_ENDPOINTS.leagueMaster, queue, region)
+  }
+
+  /**
    * Stream every ranked entry for a queue/tier/division as an async iterator,
    * paging automatically. Start from any page.
    *
@@ -131,52 +177,6 @@ export class LolLeagueNamespace extends BaseNamespace {
       },
       nextCursor: (page, result) => (result.items.length === 0 ? null : page + 1),
     })
-  }
-
-  /**
-   * The Challenger league for a queue.
-   *
-   * @param queue - Ranked queue.
-   * @param region - The platform region.
-   */
-  challenger(queue: RankedQueue, region: Region): SingleQuery<LeagueListEntity> {
-    return this.leagueList(LOL_ENDPOINTS.leagueChallenger, queue, region)
-  }
-
-  /**
-   * The Grandmaster league for a queue.
-   *
-   * @param queue - Ranked queue.
-   * @param region - The platform region.
-   */
-  grandmaster(queue: RankedQueue, region: Region): SingleQuery<LeagueListEntity> {
-    return this.leagueList(LOL_ENDPOINTS.leagueGrandmaster, queue, region)
-  }
-
-  /**
-   * The Master league for a queue.
-   *
-   * @param queue - Ranked queue.
-   * @param region - The platform region.
-   */
-  master(queue: RankedQueue, region: Region): SingleQuery<LeagueListEntity> {
-    return this.leagueList(LOL_ENDPOINTS.leagueMaster, queue, region)
-  }
-
-  /**
-   * A league by its id.
-   *
-   * @param leagueId - The league id.
-   * @param region - The platform region.
-   */
-  byId(leagueId: string, region: Region): SingleQuery<LeagueListEntity> {
-    return this.single(
-      LeagueListEntity,
-      region,
-      LOL_ENDPOINTS.leagueById,
-      this.regionContext(region),
-      { pathParams: { leagueId } },
-    )
   }
 
   private leagueList(

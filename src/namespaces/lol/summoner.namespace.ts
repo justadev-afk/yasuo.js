@@ -10,26 +10,20 @@ import { BaseNamespace } from '../base-namespace'
  */
 export class LolSummonerNamespace extends BaseNamespace {
   /**
-   * Look up a summoner by PUUID.
+   * Look up a summoner by encrypted account id.
    *
-   * Returns a lazy, chainable {@link SummonerRef}: call `.execute()` to fetch the
-   * summoner, or a relation (e.g. `.matches().execute()`) to fetch **only** that
-   * related resource — the summoner request is skipped entirely.
-   *
-   * @param puuid - The player's encrypted PUUID.
+   * @param accountId - The encrypted account id.
    * @param region - The platform region.
-   * @example
-   * ```ts
-   * // One request:
-   * const matches = await yasuo.lol.summoner.byPuuid(puuid, Region.KR).matches({ count: 5 }).execute()
-   * ```
+   * @deprecated Account ids are no longer returned by Riot — prefer {@link byPuuid}.
    */
-  byPuuid(puuid: string, region: Region): SummonerRef {
-    const context = this.regionContext(region)
-    const query = this.single(SummonerEntity, region, LOL_ENDPOINTS.summonerByPuuid, context, {
-      pathParams: { puuid },
-    })
-    return new SummonerRef(this.client, puuid, region, (exec) => query.execute(exec))
+  byAccountId(accountId: string, region: Region): SingleQuery<SummonerEntity> {
+    return this.single(
+      SummonerEntity,
+      region,
+      LOL_ENDPOINTS.summonerByAccount,
+      this.regionContext(region),
+      { pathParams: { accountId } },
+    )
   }
 
   /**
@@ -50,19 +44,25 @@ export class LolSummonerNamespace extends BaseNamespace {
   }
 
   /**
-   * Look up a summoner by encrypted account id.
+   * Look up a summoner by PUUID.
    *
-   * @param accountId - The encrypted account id.
+   * Returns a lazy, chainable {@link SummonerRef}: call `.execute()` to fetch the
+   * summoner, or a relation (e.g. `.matches().execute()`) to fetch **only** that
+   * related resource — the summoner request is skipped entirely.
+   *
+   * @param puuid - The player's encrypted PUUID.
    * @param region - The platform region.
-   * @deprecated Account ids are no longer returned by Riot — prefer {@link byPuuid}.
+   * @example
+   * ```ts
+   * // One request:
+   * const matches = await yasuo.lol.summoner.byPuuid(puuid, Region.KR).matches({ count: 5 }).execute()
+   * ```
    */
-  byAccountId(accountId: string, region: Region): SingleQuery<SummonerEntity> {
-    return this.single(
-      SummonerEntity,
-      region,
-      LOL_ENDPOINTS.summonerByAccount,
-      this.regionContext(region),
-      { pathParams: { accountId } },
-    )
+  byPuuid(puuid: string, region: Region): SummonerRef {
+    const context = this.regionContext(region)
+    const query = this.single(SummonerEntity, region, LOL_ENDPOINTS.summonerByPuuid, context, {
+      pathParams: { puuid },
+    })
+    return new SummonerRef(this.client, puuid, region, (exec) => query.execute(exec))
   }
 }

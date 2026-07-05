@@ -38,35 +38,24 @@ export class SummonerEntity extends Entity<SummonerDTO> {
     return this.context.region as Region
   }
 
-  /** A ref bound to this already-loaded summoner, reused for every relation. */
-  private ref(): SummonerRef {
-    return new SummonerRef(this.context.client, this.puuid, this.region, (exec) =>
-      exec.throw && this.error ? Promise.reject(this.error) : Promise.resolve(this),
-    )
-  }
-
   /** Resolve the underlying Riot account (game name + tag line). */
   account(): SingleQuery<AccountEntity> {
     return this.ref().account()
   }
 
-  /** This summoner's ranked league entries in every queue. */
-  leagueEntries(): CollectionQuery<LeagueEntryEntity> {
-    return this.ref().leagueEntries()
+  /** This summoner's live game, or `null` if they are not currently in one. */
+  activeGame(): SingleQuery<CurrentGameEntity | null> {
+    return this.ref().activeGame()
+  }
+
+  /** This summoner's challenge progress. */
+  challenges(): SingleQuery<PlayerChallengesEntity> {
+    return this.ref().challenges()
   }
 
   /** This summoner's champion mastery, one entry per champion played. */
   championMasteries(): CollectionQuery<ChampionMasteryEntity> {
     return this.ref().championMasteries()
-  }
-
-  /**
-   * This summoner's highest champion masteries.
-   *
-   * @param count - How many top entries to return. Defaults to Riot's default (3).
-   */
-  topChampionMasteries(count?: number): CollectionQuery<ChampionMasteryEntity> {
-    return this.ref().topChampionMasteries(count)
   }
 
   /**
@@ -78,18 +67,19 @@ export class SummonerEntity extends Entity<SummonerDTO> {
     return this.ref().championMastery(championId)
   }
 
+  /** This summoner's active Clash registrations. */
+  clashPlayers(): CollectionQuery<ClashPlayerEntity> {
+    return this.ref().clashPlayers()
+  }
+
+  /** This summoner's ranked league entries in every queue. */
+  leagueEntries(): CollectionQuery<LeagueEntryEntity> {
+    return this.ref().leagueEntries()
+  }
+
   /** This summoner's total champion mastery score. */
   masteryScore(): SingleQuery<ValueResult<number>> {
     return this.ref().masteryScore()
-  }
-
-  /**
-   * Ids of this summoner's recent matches.
-   *
-   * @param query - Optional filters (count, queue, type, time range…).
-   */
-  matchIds(query?: MatchIdsQuery): CollectionQuery<string> {
-    return this.ref().matchIds(query)
   }
 
   /**
@@ -103,12 +93,12 @@ export class SummonerEntity extends Entity<SummonerDTO> {
   }
 
   /**
-   * Stream this summoner's entire match history of ids as an async iterator.
+   * Ids of this summoner's recent matches.
    *
-   * @param options - Paging options (start offset, page size, max items…).
+   * @param query - Optional filters (count, queue, type, time range…).
    */
-  streamMatchIds(options?: MatchStreamOptions): Paginator<string> {
-    return this.ref().streamMatchIds(options)
+  matchIds(query?: MatchIdsQuery): CollectionQuery<string> {
+    return this.ref().matchIds(query)
   }
 
   /**
@@ -120,18 +110,28 @@ export class SummonerEntity extends Entity<SummonerDTO> {
     return this.ref().streamMatches(options)
   }
 
-  /** This summoner's live game, or `null` if they are not currently in one. */
-  activeGame(): SingleQuery<CurrentGameEntity | null> {
-    return this.ref().activeGame()
+  /**
+   * Stream this summoner's entire match history of ids as an async iterator.
+   *
+   * @param options - Paging options (start offset, page size, max items…).
+   */
+  streamMatchIds(options?: MatchStreamOptions): Paginator<string> {
+    return this.ref().streamMatchIds(options)
   }
 
-  /** This summoner's active Clash registrations. */
-  clashPlayers(): CollectionQuery<ClashPlayerEntity> {
-    return this.ref().clashPlayers()
+  /**
+   * This summoner's highest champion masteries.
+   *
+   * @param count - How many top entries to return. Defaults to Riot's default (3).
+   */
+  topChampionMasteries(count?: number): CollectionQuery<ChampionMasteryEntity> {
+    return this.ref().topChampionMasteries(count)
   }
 
-  /** This summoner's challenge progress. */
-  challenges(): SingleQuery<PlayerChallengesEntity> {
-    return this.ref().challenges()
+  /** A ref bound to this already-loaded summoner, reused for every relation. */
+  private ref(): SummonerRef {
+    return new SummonerRef(this.context.client, this.puuid, this.region, (exec) =>
+      exec.throw && this.error ? Promise.reject(this.error) : Promise.resolve(this),
+    )
   }
 }

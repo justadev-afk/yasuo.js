@@ -38,8 +38,14 @@ export class RedisCache implements CacheStore {
     this.keyPrefix = options.keyPrefix ?? 'yasuo:'
   }
 
-  private prefixed(key: string): string {
-    return `${this.keyPrefix}${key}`
+  async clear(): Promise<void> {
+    // Intentionally unsupported: clearing a shared Redis instance is dangerous.
+    // Delete specific keys, or flush the database out-of-band.
+    throw new Error('RedisCache.clear() is not supported; delete specific keys instead')
+  }
+
+  async delete(key: string): Promise<void> {
+    await this.client.del(this.prefixed(key))
   }
 
   async get(key: string): Promise<CachedResult | undefined> {
@@ -61,13 +67,7 @@ export class RedisCache implements CacheStore {
     await this.client.set(this.prefixed(key), JSON.stringify(value), 'PX', Math.ceil(ttlMs))
   }
 
-  async delete(key: string): Promise<void> {
-    await this.client.del(this.prefixed(key))
-  }
-
-  async clear(): Promise<void> {
-    // Intentionally unsupported: clearing a shared Redis instance is dangerous.
-    // Delete specific keys, or flush the database out-of-band.
-    throw new Error('RedisCache.clear() is not supported; delete specific keys instead')
+  private prefixed(key: string): string {
+    return `${this.keyPrefix}${key}`
   }
 }

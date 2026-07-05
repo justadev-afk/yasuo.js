@@ -16,12 +16,6 @@ export class TftMatchEntity extends Entity<TftMatchDTO> {
     return this.metadata.match_id
   }
 
-  /** The {@link Region} the match was played on, from the match id prefix. */
-  platformRegion(): Region | null {
-    const [prefix] = this.id.split('_')
-    return prefix ? regionFromPlatformId(prefix) : null
-  }
-
   /**
    * Look up a participant by PUUID.
    *
@@ -31,9 +25,10 @@ export class TftMatchEntity extends Entity<TftMatchDTO> {
     return this.info.participants.find((participant) => participant.puuid === puuid)
   }
 
-  /** The winner's participant record (placement 1), or `null`. */
-  winner(): TftParticipantDTO | null {
-    return this.info.participants.find((participant) => participant.placement === 1) ?? null
+  /** The {@link Region} the match was played on, from the match id prefix. */
+  platformRegion(): Region | null {
+    const [prefix] = this.id.split('_')
+    return prefix ? regionFromPlatformId(prefix) : null
   }
 
   /**
@@ -50,5 +45,10 @@ export class TftMatchEntity extends Entity<TftMatchDTO> {
     return this.info.participants.map((participant) =>
       this.context.client.tft.summoner.byPuuid(participant.puuid, region),
     )
+  }
+
+  /** The winner's participant record (placement 1), or `null`. */
+  winner(): TftParticipantDTO | null {
+    return this.info.participants.find((participant) => participant.placement === 1) ?? null
   }
 }

@@ -20,13 +20,26 @@ interface MemoryEntry {
  * cache is enabled without a custom backend.
  */
 export class MemoryCache implements CacheStore {
-  private readonly store = new Map<string, MemoryEntry>()
-  private readonly maxEntries: number
+  /** Current number of (possibly expired) entries. */
+  get size(): number {
+    return this.store.size
+  }
+
   private readonly clock: Clock
+  private readonly maxEntries: number
+  private readonly store = new Map<string, MemoryEntry>()
 
   constructor(options: MemoryCacheOptions = {}) {
     this.maxEntries = options.maxEntries ?? 10_000
     this.clock = options.clock ?? systemClock
+  }
+
+  clear(): void {
+    this.store.clear()
+  }
+
+  delete(key: string): void {
+    this.store.delete(key)
   }
 
   get(key: string): CachedResult | undefined {
@@ -54,18 +67,5 @@ export class MemoryCache implements CacheStore {
         this.store.delete(oldest)
       }
     }
-  }
-
-  delete(key: string): void {
-    this.store.delete(key)
-  }
-
-  clear(): void {
-    this.store.clear()
-  }
-
-  /** Current number of (possibly expired) entries. */
-  get size(): number {
-    return this.store.size
   }
 }

@@ -29,14 +29,14 @@ import type { YasuoConfig } from './config'
  * ```
  */
 export class Yasuo {
-  /** League of Legends API surface. */
-  readonly lol: LolNamespace
-  /** Teamfight Tactics API surface. */
-  readonly tft: TftNamespace
-  /** Shared Riot API surface (account). */
-  readonly riot: RiotNamespace
   /** Data Dragon static data (no API key or rate limits). */
   readonly dataDragon: DataDragonNamespace
+  /** League of Legends API surface. */
+  readonly lol: LolNamespace
+  /** Shared Riot API surface (account). */
+  readonly riot: RiotNamespace
+  /** Teamfight Tactics API surface. */
+  readonly tft: TftNamespace
 
   private readonly executor: RequestExecutor
 
