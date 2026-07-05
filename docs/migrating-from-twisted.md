@@ -133,8 +133,10 @@ const summoner = await yasuo.lol.summoner.byPuuid(puuid, Region.KR).execute({ th
 ```
 
 Need the untouched Riot payload? `.execute({ raw: true })` returns exactly what
-the API sent, typed `unknown`, bypassing entity mapping (on failure it is the
-error body Riot returned).
+the API sent, bypassing entity mapping (on failure it is the error body Riot
+returned). It is typed `unknown` by default, or pass the shape you expect as a
+type argument — `.execute<{ puuid: string; summonerLevel: number }>({ raw: true })`
+— an unchecked assertion, so it's on you to keep it accurate.
 
 (Misuse still throws eagerly: a missing or empty key throws `ApiKeyMissingError`,
 because that is a programmer error, not an API error.)

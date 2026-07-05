@@ -9,9 +9,10 @@ export interface ExecuteOptions {
    */
   throw?: boolean
   /**
-   * Return **exactly** what the Riot API returned — the parsed JSON payload,
-   * typed `unknown` — bypassing entity mapping. On a failed request this is the
-   * error body Riot sent. Default `false`.
+   * Return **exactly** what the Riot API returned — the parsed JSON payload —
+   * bypassing entity mapping. Typed `unknown` by default; pass a type argument
+   * to `execute` when you know the shape (`execute<SummonerDTO>({ raw: true })`).
+   * On a failed request this is the error body Riot sent. Default `false`.
    */
   raw?: boolean
   /** Abort signal for the underlying request. */

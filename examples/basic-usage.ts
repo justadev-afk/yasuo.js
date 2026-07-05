@@ -57,6 +57,12 @@ async function resultShape(): Promise<void> {
   // Or get exactly what Riot returned, typed `unknown`:
   const raw = await yasuo.lol.summoner.byPuuid('puuid', Region.KR).execute({ raw: true })
   console.log(raw)
+
+  // ...or supply the shape you expect as a type argument — no cast needed:
+  const typed = await yasuo.lol.summoner
+    .byPuuid('puuid', Region.KR)
+    .execute<{ puuid: string; summonerLevel: number }>({ raw: true })
+  console.log(typed.summonerLevel)
 }
 
 // --- Account → summoner → relations (single requests) ------------------------

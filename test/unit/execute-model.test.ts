@@ -3,7 +3,7 @@ import { Yasuo } from '../../src/client/yasuo'
 import { Collection } from '../../src/entities/collection'
 import { SummonerEntity } from '../../src/entities/lol/summoner.entity'
 import { ValueResult } from '../../src/entities/value-result'
-import { Region } from '../../src/enums/region'
+import { Region, RegionGroup } from '../../src/enums/region'
 import { ApiError, ApiKeyMissingError, NotFoundError } from '../../src/errors'
 import { MockHttpClient } from '../support/mock-http-client'
 
@@ -84,6 +84,25 @@ describe('.execute({ raw: true })', () => {
     const http = new MockHttpClient([{ status: 404, body: errorBody }])
     const raw = await client(http).lol.summoner.byPuuid(PUUID, Region.KR).execute({ raw: true })
     expect(raw).toEqual(errorBody)
+  })
+
+  test('a type argument types the payload (no cast needed)', async () => {
+    const payload = { puuid: PUUID, summonerLevel: 42 }
+    const http = new MockHttpClient([{ status: 200, body: payload }])
+    // The generic is a compile-time assertion — `tsc` checks the field access.
+    const raw = await client(http)
+      .lol.summoner.byPuuid(PUUID, Region.KR)
+      .execute<{ puuid: string; summonerLevel: number }>({ raw: true })
+    expect(raw.summonerLevel).toBe(42)
+  })
+
+  test('a collection raw payload can be typed too', async () => {
+    const http = new MockHttpClient([{ status: 200, body: ['KR_1', 'KR_2'] }])
+    const ids = await client(http)
+      .lol.match.idsByPuuid(PUUID, RegionGroup.ASIA)
+      .execute<string[]>({ raw: true })
+    expect(ids).toEqual(['KR_1', 'KR_2'])
+    expect(ids.length).toBe(2)
   })
 })
 

@@ -111,8 +111,12 @@ console.log(summoner.summonerLevel)
 // Prefer exceptions? Opt in per call:
 const strict = await yasuo.lol.summoner.byPuuid(puuid, Region.KR).execute({ throw: true })
 
-// Want exactly what Riot returned (typed `unknown`)? Pass { raw: true }:
+// Want exactly what Riot returned? Pass { raw: true } — typed `unknown` by
+// default, or supply the shape you expect as a type argument:
 const raw = await yasuo.lol.summoner.byPuuid(puuid, Region.KR).execute({ raw: true })
+const dto = await yasuo.lol.summoner
+  .byPuuid(puuid, Region.KR)
+  .execute<{ puuid: string; summonerLevel: number }>({ raw: true }) // typed, no cast
 ```
 
 Scalar endpoints (e.g. a mastery score) can't hang metadata off a primitive, so they resolve a small `ValueResult<T>` — read the number from `.value`, with the same `.error`/`.http`:

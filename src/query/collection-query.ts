@@ -7,8 +7,9 @@ import type { ExecuteOptions, QueryRunner } from './execute-options'
  * Building the query performs no I/O — call {@link execute} to run it. It
  * resolves to a {@link Collection} **directly** (an array carrying its own
  * `.error` and `.http`); it does not throw for an API-level failure unless you
- * pass `{ throw: true }`. Pass `{ raw: true }` to get the raw Riot payload as
- * `unknown` instead.
+ * pass `{ throw: true }`. Pass `{ raw: true }` to get the raw Riot payload; it is
+ * typed `unknown` by default, or supply a type argument when you know the shape:
+ * `execute<string[]>({ raw: true })`.
  *
  * @typeParam T - The item type of the resolved collection.
  * @example
@@ -24,8 +25,13 @@ export class CollectionQuery<T> {
    */
   constructor(private readonly runner: QueryRunner<Collection<T>>) {}
 
-  /** Run the request and resolve the raw Riot payload as `unknown`. */
-  execute(options: ExecuteOptions & { raw: true }): Promise<unknown>
+  /**
+   * Run the request and resolve the raw Riot payload. Typed `unknown` by
+   * default; pass a type argument when you know the shape
+   * (`execute<string[]>({ raw: true })`) — an unchecked assertion, so it is your
+   * responsibility that it matches.
+   */
+  execute<R = unknown>(options: ExecuteOptions & { raw: true }): Promise<R>
   /** Run the request and resolve the {@link Collection} directly. */
   execute(options?: ExecuteOptions): Promise<Collection<T>>
   execute(options: ExecuteOptions = {}): Promise<Collection<T> | unknown> {
