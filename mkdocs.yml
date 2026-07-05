@@ -14,7 +14,7 @@ copyright: Copyright &copy; justadev-afk — MIT licensed
 theme:
   name: material
   language: en
-  custom_dir: overrides
+  custom_dir: docs/overrides
   icon:
     repo: fontawesome/brands/github
     logo: material/sword-cross
@@ -105,6 +105,11 @@ markdown_extensions:
 
 plugins:
   - search
+
+# The theme override lives under docs/overrides so it isn't a stray root dir;
+# exclude it from the page build so it isn't treated as documentation content.
+exclude_docs: |
+  overrides/
 
 extra_css:
   - stylesheets/extra.css
