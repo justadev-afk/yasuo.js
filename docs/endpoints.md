@@ -1,8 +1,8 @@
 # Endpoint coverage
 
-`yasuo` exposes every Riot Games API endpoint as a typed, discoverable method, grouped by game and Riot service. Reach each service through a game-scoped namespace on the client — `yasuo.lol.*`, `yasuo.tft.*`, `yasuo.riot.*` and `yasuo.dataDragon.*`. Each method returns a **query builder** you run with a terminal `.execute()`, which resolves — non-throwing — to a rich entity, a `Collection`, or a scalar `ValueResult` directly (never a raw wire DTO), each carrying its own [`.error`/`.http`](errors.md) (opt into throwing with `.execute({ throw: true })`, or get the raw payload with `.execute({ raw: true })`). Two exceptions: `stream*` methods return a [`Paginator`](pagination.md) you loop with `for await`, and `yasuo.dataDragon.*` returns raw DTO promises directly. Platform-scoped services route by `Region`; `match`/`account` route by `RegionGroup`. This page is the exhaustive method-by-method reference.
+`yasuo` exposes every Riot Games API endpoint as a typed, discoverable method, grouped by game and Riot service. Reach each service through a game-scoped namespace on the client — `yasuo.lol.*`, `yasuo.tft.*`, `yasuo.val.*`, `yasuo.lor.*`, `yasuo.riot.*` and `yasuo.dataDragon.*`. Each method returns a **query builder** you run with a terminal `.execute()`, which resolves — non-throwing — to a rich entity, a `Collection`, or a scalar `ValueResult` directly (never a raw wire DTO), each carrying its own [`.error`/`.http`](errors.md) (opt into throwing with `.execute({ throw: true })`, or get the raw payload with `.execute({ raw: true })`). Two exceptions: `stream*` methods return a [`Paginator`](pagination.md) you loop with `for await`, and `yasuo.dataDragon.*` returns raw DTO promises directly. Platform-scoped services route by `Region`; `match`/`account`/LoR/Tournament route by `RegionGroup`; VALORANT routes by `Shard`. This page is the exhaustive method-by-method reference.
 
-**Coverage: 33 LoL + 14 TFT + 4 Riot Account endpoints + Data Dragon = full parity with the current Riot API.**
+**Coverage: 44 LoL (incl. Tournament-V5 + stub) + 14 TFT + 8 VALORANT + 4 Legends of Runeterra + 4 Riot Account endpoints + Data Dragon = 100% of the key-authenticated Riot API.** The only endpoints not wrapped are the RSO/OAuth-gated ones (LoR Deck & Inventory, RSO Match), which need a user-authorization flow rather than an API key.
 
 > The **Returns** column shows what a query method's `.execute()` resolves to: an entity or a `Collection` **directly**, or — for scalar endpoints — a `ValueResult` you read via `.value`. `Paginator` rows are async-iterables you consume with `for await`; Data Dragon rows are raw payload promises. Lazy [`*Ref`](entities-and-relations.md) builders are `SingleQuery` subclasses — `.execute()` them, or chain a relation and `.execute()` that instead.
 
@@ -94,6 +94,31 @@ All match methods use **regional** routing (`RegionGroup`).
 | `yasuo.lol.challenges.percentilesById(challengeId: number, region: Region)` | `LOL-CHALLENGES-V1 /challenges/{challengeId}/percentiles` | Region | `ChallengePercentilesEntity` |
 | `yasuo.lol.challenges.player(puuid: string, region: Region)` | `LOL-CHALLENGES-V1 /player-data/{puuid}` | Region | `PlayerChallengesEntity` |
 
+### TOURNAMENT-V5 — `yasuo.lol.tournament`
+
+Regional routing (`RegionGroup`, usually `AMERICAS`). Creation calls are `POST`, `updateCode` is a `PUT`, both with a JSON body; signed with the LoL key. Needs a production key with tournament access — mirror the flow with `yasuo.lol.tournamentStub` (below) without one.
+
+| Method | Riot API | Routing | Returns |
+| --- | --- | --- | --- |
+| `yasuo.lol.tournament.registerProvider(params: TournamentProviderRegistrationDTO, regionGroup: RegionGroup)` | `TOURNAMENT-V5 POST /providers` | RegionGroup | `ValueResult<number>` (provider id; read `.value`) |
+| `yasuo.lol.tournament.registerTournament(params: TournamentRegistrationDTO, regionGroup: RegionGroup)` | `TOURNAMENT-V5 POST /tournaments` | RegionGroup | `ValueResult<number>` (tournament id; read `.value`) |
+| `yasuo.lol.tournament.createCodes(params: TournamentCodeParametersDTO, regionGroup: RegionGroup, options: { tournamentId: number, count?: number })` | `TOURNAMENT-V5 POST /codes` | RegionGroup | `Collection<string>` (codes) |
+| `yasuo.lol.tournament.getCode(tournamentCode: string, regionGroup: RegionGroup)` | `TOURNAMENT-V5 GET /codes/{tournamentCode}` | RegionGroup | `TournamentCodeEntity` |
+| `yasuo.lol.tournament.updateCode(tournamentCode: string, params: TournamentCodeUpdateParametersDTO, regionGroup: RegionGroup)` | `TOURNAMENT-V5 PUT /codes/{tournamentCode}` | RegionGroup | `ValueResult<void>` (success = `.error` null) |
+| `yasuo.lol.tournament.lobbyEvents(tournamentCode: string, regionGroup: RegionGroup)` | `TOURNAMENT-V5 GET /lobby-events/by-code/{tournamentCode}` | RegionGroup | `LobbyEventsEntity` |
+
+### TOURNAMENT-STUB-V5 — `yasuo.lol.tournamentStub`
+
+Same shape as `tournament` minus `updateCode`; mints fake providers/tournaments/codes with no production key.
+
+| Method | Riot API | Routing | Returns |
+| --- | --- | --- | --- |
+| `yasuo.lol.tournamentStub.registerProvider(params, regionGroup)` | `TOURNAMENT-STUB-V5 POST /providers` | RegionGroup | `ValueResult<number>` |
+| `yasuo.lol.tournamentStub.registerTournament(params, regionGroup)` | `TOURNAMENT-STUB-V5 POST /tournaments` | RegionGroup | `ValueResult<number>` |
+| `yasuo.lol.tournamentStub.createCodes(params, regionGroup, options)` | `TOURNAMENT-STUB-V5 POST /codes` | RegionGroup | `Collection<string>` |
+| `yasuo.lol.tournamentStub.getCode(tournamentCode, regionGroup)` | `TOURNAMENT-STUB-V5 GET /codes/{tournamentCode}` | RegionGroup | `TournamentCodeEntity` |
+| `yasuo.lol.tournamentStub.lobbyEvents(tournamentCode, regionGroup)` | `TOURNAMENT-STUB-V5 GET /lobby-events/by-code/{tournamentCode}` | RegionGroup | `LobbyEventsEntity` |
+
 ## Teamfight Tactics — `yasuo.tft`
 
 ### TFT-SUMMONER-V1 — `yasuo.tft.summoner`
@@ -133,6 +158,68 @@ All match methods use **regional** routing (`RegionGroup`).
 | --- | --- | --- | --- |
 | `yasuo.tft.spectator.active(puuid: string, region: Region)` | `SPECTATOR-TFT-V5 /active-games/by-puuid/{puuid}` | Region | `CurrentGameEntity \| null` |
 | `yasuo.tft.spectator.featured(region: Region)` | `SPECTATOR-TFT-V5 /featured-games` | Region | `FeaturedGamesEntity` |
+
+## VALORANT — `yasuo.val`
+
+Every VALORANT service routes by `Shard` (`NA`, `EU`, `AP`, `KR`, `LATAM`, `BR`, `ESPORTS`). Match, ranked and console endpoints need a production key with VALORANT access.
+
+### VAL-CONTENT-V1 — `yasuo.val.content`
+
+| Method | Riot API | Routing | Returns |
+| --- | --- | --- | --- |
+| `yasuo.val.content.get(shard: Shard, locale?: string)` | `VAL-CONTENT-V1 /contents` | Shard | `ValContentEntity` |
+
+### VAL-MATCH-V1 — `yasuo.val.match`
+
+| Method | Riot API | Routing | Returns |
+| --- | --- | --- | --- |
+| `yasuo.val.match.get(matchId: string, shard: Shard)` | `VAL-MATCH-V1 /matches/{matchId}` | Shard | `ValMatchEntity` |
+| `yasuo.val.match.matchlist(puuid: string, shard: Shard)` | `VAL-MATCH-V1 /matchlists/by-puuid/{puuid}` | Shard | `ValMatchlistEntity` |
+| `yasuo.val.match.recent(queue: ValQueue \| string, shard: Shard)` | `VAL-MATCH-V1 /recent-matches/by-queue/{queue}` | Shard | `ValRecentMatchesEntity` |
+| `yasuo.val.match.byPuuid(puuid: string, shard: Shard, options?: { count?: number })` | `VAL-MATCH-V1 /matchlists/by-puuid/{puuid}` + `/matches/{id}` | Shard | `Collection<ValMatchEntity>` |
+
+### VAL-CONSOLE-MATCH-V1 — `yasuo.val.consoleMatch`
+
+| Method | Riot API | Routing | Returns |
+| --- | --- | --- | --- |
+| `yasuo.val.consoleMatch.matchlist(puuid: string, shard: Shard, platformType: ValPlatformType)` | `VAL-CONSOLE-MATCH-V1 /matchlists/by-puuid/{puuid}` | Shard | `ValMatchlistEntity` |
+| `yasuo.val.consoleMatch.recent(queue: ValQueue \| string, shard: Shard, platformType: ValPlatformType)` | `VAL-CONSOLE-MATCH-V1 /recent-matches/by-queue/{queue}` | Shard | `ValRecentMatchesEntity` |
+
+### VAL-RANKED-V1 — `yasuo.val.ranked`
+
+| Method | Riot API | Routing | Returns |
+| --- | --- | --- | --- |
+| `yasuo.val.ranked.leaderboard(actId: string, shard: Shard, query?: ValLeaderboardQuery)` | `VAL-RANKED-V1 /leaderboards/by-act/{actId}` | Shard | `ValLeaderboardEntity` |
+
+### VAL-STATUS-V1 — `yasuo.val.status`
+
+| Method | Riot API | Routing | Returns |
+| --- | --- | --- | --- |
+| `yasuo.val.status.get(shard: Shard)` | `VAL-STATUS-V1 /platform-data` | Shard | `PlatformStatusEntity` |
+
+## Legends of Runeterra — `yasuo.lor`
+
+Every LoR service routes by `RegionGroup` (`AMERICAS`, `ASIA`, `EUROPE`, `SEA`).
+
+### LOR-MATCH-V1 — `yasuo.lor.match`
+
+| Method | Riot API | Routing | Returns |
+| --- | --- | --- | --- |
+| `yasuo.lor.match.idsByPuuid(puuid: string, regionGroup: RegionGroup)` | `LOR-MATCH-V1 /matches/by-puuid/{puuid}/ids` | RegionGroup | `Collection<string>` |
+| `yasuo.lor.match.get(matchId: string, regionGroup: RegionGroup)` | `LOR-MATCH-V1 /matches/{matchId}` | RegionGroup | `LorMatchEntity` |
+| `yasuo.lor.match.byPuuid(puuid: string, regionGroup: RegionGroup)` | `LOR-MATCH-V1 /matches/by-puuid/{puuid}/ids` + `/matches/{id}` | RegionGroup | `Collection<LorMatchEntity>` |
+
+### LOR-RANKED-V1 — `yasuo.lor.ranked`
+
+| Method | Riot API | Routing | Returns |
+| --- | --- | --- | --- |
+| `yasuo.lor.ranked.leaderboard(regionGroup: RegionGroup)` | `LOR-RANKED-V1 /leaderboards` | RegionGroup | `LorLeaderboardEntity` |
+
+### LOR-STATUS-V1 — `yasuo.lor.status`
+
+| Method | Riot API | Routing | Returns |
+| --- | --- | --- | --- |
+| `yasuo.lor.status.get(regionGroup: RegionGroup)` | `LOR-STATUS-V1 /platform-data` | RegionGroup | `PlatformStatusEntity` |
 
 ## Riot Account — `yasuo.riot.account`
 

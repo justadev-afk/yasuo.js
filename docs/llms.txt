@@ -1,10 +1,12 @@
 # yasuo
 
 > yasuo is a modern, fully-typed, **zero-runtime-dependency** TypeScript client for
-> the Riot Games API (League of Legends, Teamfight Tactics and the Riot Account
-> API). It is the evolution of `twisted`, rebuilt around a Supabase-style query
-> builder, lazy relation-aware chaining, a proactive rate limiter, pluggable
-> caching/transport, a leveled logger and async iterators.
+> the Riot Games API — complete coverage of League of Legends, Teamfight Tactics,
+> VALORANT, Legends of Runeterra, Tournament-V5 and the Riot Account API. It is the
+> evolution of `twisted`, rebuilt around a Supabase-style query builder, lazy
+> relation-aware chaining, a proactive rate limiter, pluggable caching/transport,
+> a leveled logger and async iterators. It wraps 100% of the key-authenticated Riot
+> API surface and can sign each product with its own API key.
 
 This file is the single, self-contained reference an LLM or coding agent needs to
 use yasuo correctly. It is kept in sync with the public API — if anything here
@@ -94,11 +96,32 @@ const yasuo = new Yasuo({
 
 Bun auto-loads `.env`. On Node, load it yourself (e.g. `node --env-file=.env`).
 
+### Per-product API keys (`keys`)
+
+Riot recommends a separate product/key per game. Pass a `keys` map (keyed by
+`Game`: `lol`, `tft`, `val`, `lor`, `riot`) and each request is signed with the
+key for its product; distinct keys get **independent app rate-limit buckets**.
+
+```ts
+new Yasuo({
+  keys: { lol: LOL_KEY, tft: TFT_KEY, val: VAL_KEY, lor: LOR_KEY },
+  key: SHARED_KEY,        // fallback for any product without its own key (e.g. account)
+})
+```
+
+Resolution order per request: `keys[game]` → `RIOT_<GAME>_API_KEY` env
+(`RIOT_LOL_API_KEY`, `RIOT_TFT_API_KEY`, `RIOT_VAL_API_KEY`, `RIOT_LOR_API_KEY`,
+`RIOT_ACCOUNT_API_KEY`) → shared `key` → `RIOT_API_KEY` env. The Account API
+(`riot`) also borrows any configured product key as a last resort. No key
+resolves for a request's product → `ApiKeyMissingError` (names the product).
+`ApiKeyMap` = `Partial<Record<'lol'|'tft'|'val'|'lor'|'riot', string>>`.
+
 ### `YasuoConfig` — every field is optional
 
 | Option | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `key` | `string` | `RIOT_API_KEY` env | Riot API key. Missing → `ApiKeyMissingError` at request time. |
+| `key` | `string` | `RIOT_API_KEY` env | Shared Riot API key; used for any product without a `keys` entry. Missing → `ApiKeyMissingError` at request time. |
+| `keys` | `ApiKeyMap` | — | Per-product keys (`{ lol, tft, val, lor, riot }`); each falls back to `key`. See above. |
 | `baseUrl` | `string` | Riot host | URL template with `{routing}`/`{game}` placeholders; point at a proxy. |
 | `rateLimit` | `boolean \| RateLimiterOptions` | `false` | Proactive limiter (off). `true`/object enables it. Reactive retries stay on regardless. |
 | `retry` | `boolean \| RetryOptions` | `true` | Reactive retry for `429`/`5xx` (3 attempts, `retry-after`-aware). |
@@ -167,18 +190,24 @@ error, even with `{ throw: true }`. Only `404` is absorbed this way.
   `Region.RU`, … Used by Summoner, League, Champion Mastery, Champion, Spectator,
   Status, Clash, Challenges.
 - **`RegionGroup`** (regional) — `AMERICAS`, `ASIA`, `EUROPE`, `SEA`. Used by
-  Match-V5, TFT Match. The **Account** API accepts only `AMERICAS`, `ASIA`, `EUROPE`
-  (typed `AccountRegionGroup`).
+  Match-V5, TFT Match, **all Legends of Runeterra** services and **Tournament-V5**.
+  The **Account** API accepts only `AMERICAS`, `ASIA`, `EUROPE` (typed
+  `AccountRegionGroup`).
+- **`Shard`** (VALORANT platform) — `AP`, `BR`, `ESPORTS`, `EU`, `KR`, `LATAM`,
+  `NA`. Every `yasuo.val.*` service routes by `Shard` (VALORANT does not use
+  `Region`/`RegionGroup`).
 
 `byRiotId` takes a `RegionGroup`; `byPuuid` takes a `Region`. Lazy relations map
 between them automatically (a `KR` summoner streams matches from `ASIA` with no
-re-specification).
+re-specification); a VALORANT matchlist resolves its full matches on the same
+`Shard`.
 
 ---
 
 ## Namespaces & endpoints
 
-Access shape: `yasuo.lol.*`, `yasuo.tft.*`, `yasuo.riot.account`, `yasuo.dataDragon`.
+Access shape: `yasuo.lol.*`, `yasuo.tft.*`, `yasuo.val.*`, `yasuo.lor.*`,
+`yasuo.riot.account`, `yasuo.dataDragon`.
 Every method below returns a query — run it with `.execute()` — unless marked
 `Paginator` (iterate with `for await`) or under Data Dragon (awaited DTOs).
 `(deprecated)` methods still work but Riot is phasing out encrypted ids for PUUIDs.
@@ -239,6 +268,16 @@ Every method below returns a query — run it with `.execute()` — unless marke
 - `percentilesById(challengeId, region)` → `ChallengePercentilesEntity`
 - `player(puuid, region)` → `PlayerChallengesEntity`
 
+**`yasuo.lol.tournament`** (TOURNAMENT-V5, `RegionGroup`; POST/PUT with JSON body, signed with the LoL key)
+- `registerProvider(params, regionGroup)` → `ValueResult<number>` (provider id in `.value`); `params: { region, url }`
+- `registerTournament(params, regionGroup)` → `ValueResult<number>` (tournament id); `params: { providerId, name? }`
+- `createCodes(params, regionGroup, { tournamentId, count? })` → `Collection<string>` (the codes); `params: TournamentCodeParametersDTO`
+- `getCode(tournamentCode, regionGroup)` → `TournamentCodeEntity`
+- `updateCode(tournamentCode, params, regionGroup)` → `ValueResult<void>` (PUT; success = `.error` is null)
+- `lobbyEvents(tournamentCode, regionGroup)` → `LobbyEventsEntity` (`.events()`)
+
+**`yasuo.lol.tournamentStub`** (TOURNAMENT-STUB-V5, `RegionGroup`) — same as `tournament` minus `updateCode`; mints fake providers/tournaments/codes with no production key.
+
 ### Teamfight Tactics — `yasuo.tft`
 
 **`yasuo.tft.summoner`** (TFT-SUMMONER-V1, `Region`)
@@ -262,6 +301,40 @@ Every method below returns a query — run it with `.execute()` — unless marke
 **`yasuo.tft.spectator`** (SPECTATOR-TFT-V5, `Region`)
 - `active(puuid, region)` → `CurrentGameEntity | null`
 - `featured(region)` → `FeaturedGamesEntity`
+
+### VALORANT — `yasuo.val` (routes by `Shard`)
+
+**`yasuo.val.content`** (VAL-CONTENT-V1)
+- `get(shard, locale?)` → `ValContentEntity` (`.activeAct()`; agents/maps/skins/acts arrays)
+
+**`yasuo.val.match`** (VAL-MATCH-V1)
+- `get(matchId, shard)` → `ValMatchEntity` (`.winningTeam()`, `.player(puuid)`, `.id`)
+- `matchlist(puuid, shard)` → `ValMatchlistEntity` (`.matchIds()`, lazy `.match(id)`)
+- `recent(queue, shard)` → `ValRecentMatchesEntity` (`.matchIds`, lazy `.match(id)`); `queue`: `ValQueue | string`
+- `byPuuid(puuid, shard, { count? })` → `Collection<ValMatchEntity>` (matchlist + hydrate)
+
+**`yasuo.val.consoleMatch`** (VAL-CONSOLE-MATCH-V1; requires `ValPlatformType`)
+- `matchlist(puuid, shard, platformType)` → `ValMatchlistEntity`
+- `recent(queue, shard, platformType)` → `ValRecentMatchesEntity`
+
+**`yasuo.val.ranked`** (VAL-RANKED-V1)
+- `leaderboard(actId, shard, { size?, startIndex? })` → `ValLeaderboardEntity` (`.top(n)`, `.player(puuid)`)
+
+**`yasuo.val.status`** (VAL-STATUS-V1)
+- `get(shard)` → `PlatformStatusEntity` (same entity as `lol.status`; `.hasActiveIssues()`)
+
+### Legends of Runeterra — `yasuo.lor` (routes by `RegionGroup`)
+
+**`yasuo.lor.match`** (LOR-MATCH-V1)
+- `idsByPuuid(puuid, regionGroup)` → `Collection<string>`
+- `get(matchId, regionGroup)` → `LorMatchEntity` (`.winner()`, `.player(puuid)`, `.id`)
+- `byPuuid(puuid, regionGroup)` → `Collection<LorMatchEntity>` (ids + hydrate)
+
+**`yasuo.lor.ranked`** (LOR-RANKED-V1)
+- `leaderboard(regionGroup)` → `LorLeaderboardEntity` (Master tier; `.top(n)`, `.player(name)`)
+
+**`yasuo.lor.status`** (LOR-STATUS-V1)
+- `get(regionGroup)` → `PlatformStatusEntity`
 
 ### Riot Account — `yasuo.riot.account` (ACCOUNT-V1, `AccountRegionGroup`)
 
@@ -406,9 +479,10 @@ new Yasuo({ key, cache: { namespaces: {
 `CacheOptions`: `{ enabled?, store?, ttlMs?, namespaces? }`. `store` accepts a
 `CacheStore`, or a raw Redis client / Cloudflare KV binding (auto-wrapped in
 `RedisCache`/`KVCache`). Per-call override: `execute({ cache })` (see the execution
-table). Default TTLs: `riot.account` 1h, `lol.champion`/`lol.match`/`tft.match` 1h,
-`lol.summoner`/`tft.summoner`/`lol.clash`/`lol.mastery` 5min, `lol.status` 2min,
-`lol.league`/`tft.league` 1min, `lol.challenges` 10min, spectator 10s.
+table). Default TTLs: `riot.account` 1h, `lol.champion`/`lol.match`/`tft.match`/`val.match`/`val.consoleMatch`/`val.content`/`lor.match` 1h,
+`lol.summoner`/`tft.summoner`/`lol.clash`/`lol.mastery`/`val.ranked`/`lor.ranked` 5min,
+`lol.status`/`val.status`/`lor.status` 2min, `lol.league`/`tft.league` 1min,
+`lol.challenges` 10min, `lol.tournament` 1min, spectator 10s.
 
 Stores:
 - **`MemoryCache`** — default; per-process `Map`, FIFO eviction, `{ maxEntries?=10000, clock? }`.
@@ -424,9 +498,11 @@ Stores:
 ## HTTP transport & middleware
 
 **Custom client** — implement `HttpClient` (`send(request): Promise<HttpResponse>`).
-`HttpRequest = { url, method, headers, signal? }`; `HttpResponse = { status, ok,
-headers, body }` with lower-cased header keys and a pre-parsed body. Default is
-`FetchHttpClient` (accepts a custom `fetch`).
+`HttpRequest = { url, method, headers, signal?, body? }`; `HttpResponse = { status,
+ok, headers, body }` with lower-cased header keys and a pre-parsed body. Default is
+`FetchHttpClient` (accepts a custom `fetch`). Most endpoints are `GET`; the
+Tournament-V5 create/update calls are `POST`/`PUT` — yasuo sets `content-type:
+application/json`, `JSON.stringify`s `body`, and **never caches non-GET** responses.
 
 **Middleware** — axios-style onion `(request, next, context) => Promise<response>`.
 Register global (`config.middleware` / `yasuo.use(...)`) and per-service
@@ -508,12 +584,15 @@ Import from `'yasuo.js'`. Common ones:
 
 - `Region` — platform routing (`KR`, `EUW`, `NA1`, `EUN1`, `BR1`, `JP1`, `LA1`, `LA2`, `OC1`, `TR1`, `RU`, …).
 - `RegionGroup` — regional routing (`AMERICAS`, `ASIA`, `EUROPE`, `SEA`). `AccountRegionGroup` = the first three only.
-- `Game` — `LOL`, `TFT`, `VAL`, `LOR` (for account active-shard/region).
+- `Game` — `LOL`, `TFT`, `VAL`, `LOR`, `RIOT` (URL segment + per-product key selector; also the account active-shard/region `by-game` value, where `RIOT` is invalid).
+- `Shard` — VALORANT routing: `AP`, `BR`, `ESPORTS`, `EU`, `KR`, `LATAM`, `NA`.
 - `RankedQueue` — `SOLO_5x5`, `FLEX_SR`, `FLEX_TT`, …
 - `Tier` — `IRON`…`CHALLENGER`. `Division` — `I`, `II`, `III`, `IV`.
 - `MatchType` — `RANKED`, `NORMAL`, `TOURNAMENT`, … (match-list `type` filter).
 - `ChallengeLevel` — `NONE`…`CHALLENGER` (challenge leaderboards).
 - `TftRatedLadderQueue` — TFT rated-ladder queue.
+- `ValQueue` — VALORANT queues (`COMPETITIVE`, `UNRATED`, …); `ValPlatformType` — `PLAYSTATION`, `XBOX` (console match).
+- `TournamentMap`, `TournamentPickType`, `TournamentSpectatorType`, `TournamentRegion` — tournament code/provider params.
 - `LogLevel` — see Logging.
 
 DTOs (`*DTO`, raw wire shapes) and entities (`*Entity`) are all exported too.
@@ -522,7 +601,7 @@ DTOs (`*DTO`, raw wire shapes) and entities (`*Entity`) are all exported too.
 
 ## Full public surface (`import { … } from 'yasuo.js'`)
 
-- Client: `Yasuo`. Config types: `YasuoConfig`, `RetryOptions`, `CacheOptions`, `NamespaceCacheOptions`, `Resolved*`.
+- Client: `Yasuo`. Config types: `YasuoConfig`, `ApiKeyMap`, `RetryOptions`, `CacheOptions`, `NamespaceCacheOptions`, `Resolved*` (incl. `ResolvedApiKeys`).
 - Query: `SingleQuery`, `CollectionQuery`; types `ExecuteOptions`, `ExecuteCacheOptions`, `QueryRunner`.
 - Caching: `MemoryCache`, `RedisCache`, `KVCache`, `coerceCacheStore`; types `CacheStore`, `CacheStoreLike`, `CachedResult`, `*CacheOptions`, `RedisClientLike`, `KVNamespaceLike`.
 - HTTP: `FetchHttpClient`; types `HttpClient`, `HttpRequest`, `HttpResponse`.
@@ -530,7 +609,7 @@ DTOs (`*DTO`, raw wire shapes) and entities (`*Entity`) are all exported too.
 - Logging: `LogLevel`, `createConsoleLogger`, `noopLogger`, `parseLogLevel`, `resolveLogLevel`; type `Logger`.
 - Pagination: `Paginator`; types `Page`, `PaginatorConfig`.
 - Rate limiting: `RateLimiter`; type `RateLimiterOptions`.
-- Endpoints (advanced): `LOL_ENDPOINTS`, `TFT_ENDPOINTS`, `RIOT_ENDPOINTS`; type `Endpoint`.
+- Endpoints (advanced): `LOL_ENDPOINTS`, `TFT_ENDPOINTS`, `VAL_ENDPOINTS`, `LOR_ENDPOINTS`, `TOURNAMENT_ENDPOINTS`, `RIOT_ENDPOINTS`; type `Endpoint` (now with optional `method`).
 - Errors: `YasuoError`, `ApiError`, `ApiKeyMissingError`, `UnauthorizedError`, `ForbiddenError`, `NotFoundError`, `RateLimitError`, `ServiceUnavailableError`.
 - Enums: all of `src/enums`. Entities: all `*Entity`. DTOs: all `*DTO`.
 

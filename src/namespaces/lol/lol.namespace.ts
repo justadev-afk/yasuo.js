@@ -9,6 +9,8 @@ import { LolMatchNamespace } from './match.namespace'
 import { LolSpectatorNamespace } from './spectator.namespace'
 import { LolStatusNamespace } from './status.namespace'
 import { LolSummonerNamespace } from './summoner.namespace'
+import { TournamentNamespace } from './tournament.namespace'
+import { TournamentStubNamespace } from './tournament-stub.namespace'
 
 /**
  * League of Legends API surface, grouped by Riot service.
@@ -34,6 +36,10 @@ export class LolNamespace {
   readonly status: LolStatusNamespace
   /** SUMMONER-V4. */
   readonly summoner: LolSummonerNamespace
+  /** TOURNAMENT-V5 (live). */
+  readonly tournament: TournamentNamespace
+  /** TOURNAMENT-STUB-V5 (no production key required). */
+  readonly tournamentStub: TournamentStubNamespace
 
   constructor(executor: RequestExecutor, client: Yasuo) {
     this.summoner = new LolSummonerNamespace(executor, client)
@@ -45,5 +51,7 @@ export class LolNamespace {
     this.status = new LolStatusNamespace(executor, client)
     this.clash = new LolClashNamespace(executor, client)
     this.challenges = new LolChallengesNamespace(executor, client)
+    this.tournament = new TournamentNamespace(executor, client)
+    this.tournamentStub = new TournamentStubNamespace(executor, client)
   }
 }
