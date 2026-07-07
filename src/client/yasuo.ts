@@ -2,8 +2,10 @@ import type { HttpMiddleware } from '../core/http/middleware'
 import { RequestExecutor } from '../core/request/request-executor'
 import { DataDragonNamespace } from '../namespaces/data-dragon/data-dragon.namespace'
 import { LolNamespace } from '../namespaces/lol/lol.namespace'
+import { LorNamespace } from '../namespaces/lor/lor.namespace'
 import { RiotNamespace } from '../namespaces/riot/riot.namespace'
 import { TftNamespace } from '../namespaces/tft/tft.namespace'
+import { ValNamespace } from '../namespaces/val/val.namespace'
 import type { YasuoConfig } from './config'
 
 /**
@@ -11,16 +13,21 @@ import type { YasuoConfig } from './config'
  *
  * Instantiate it once and reach every service through a game-scoped namespace:
  *
- * - `yasuo.lol` — League of Legends (summoner, league, match, mastery, …)
+ * - `yasuo.lol` — League of Legends (summoner, league, match, mastery, tournament, …)
  * - `yasuo.tft` — Teamfight Tactics
+ * - `yasuo.val` — VALORANT (content, match, ranked, status)
+ * - `yasuo.lor` — Legends of Runeterra (match, ranked, status)
  * - `yasuo.riot` — shared Riot services (account)
  * - `yasuo.dataDragon` — static game data (no key required)
+ *
+ * Each product can be signed with its own API key — Riot recommends one product
+ * key per game (see {@link YasuoConfig.keys}).
  *
  * @example
  * ```ts
  * import { Yasuo, Region, RegionGroup } from 'yasuo.js'
  *
- * const yasuo = new Yasuo({ key: process.env.RIOT_API_KEY, cache: true, logLevel: LogLevel.INFO })
+ * const yasuo = new Yasuo({ keys: { lol: LOL_KEY, val: VAL_KEY }, cache: true })
  *
  * const account  = await yasuo.riot.account.byRiotId('Hide on bush', 'KR1', RegionGroup.ASIA)
  * const summoner = await account.summoner(Region.KR)
@@ -33,22 +40,29 @@ export class Yasuo {
   readonly dataDragon: DataDragonNamespace
   /** League of Legends API surface. */
   readonly lol: LolNamespace
+  /** Legends of Runeterra API surface. */
+  readonly lor: LorNamespace
   /** Shared Riot API surface (account). */
   readonly riot: RiotNamespace
   /** Teamfight Tactics API surface. */
   readonly tft: TftNamespace
+  /** VALORANT API surface. */
+  readonly val: ValNamespace
 
   private readonly executor: RequestExecutor
 
   /**
    * @param config - Client configuration, or a bare API key string. When
-   * omitted, the key is read from the `RIOT_API_KEY` environment variable.
+   * omitted, keys are read from the `RIOT_API_KEY` (and per-product) environment
+   * variables.
    */
   constructor(config: YasuoConfig | string = {}) {
     const resolved: YasuoConfig = typeof config === 'string' ? { key: config } : config
     this.executor = new RequestExecutor(resolved)
     this.lol = new LolNamespace(this.executor, this)
     this.tft = new TftNamespace(this.executor, this)
+    this.val = new ValNamespace(this.executor, this)
+    this.lor = new LorNamespace(this.executor, this)
     this.riot = new RiotNamespace(this.executor, this)
     this.dataDragon = new DataDragonNamespace()
   }

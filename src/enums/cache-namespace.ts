@@ -16,11 +16,20 @@ export enum CacheNamespace {
   LolSpectator = 'lol.spectator',
   LolStatus = 'lol.status',
   LolSummoner = 'lol.summoner',
+  LolTournament = 'lol.tournament',
+  LorMatch = 'lor.match',
+  LorRanked = 'lor.ranked',
+  LorStatus = 'lor.status',
   RiotAccount = 'riot.account',
   TftLeague = 'tft.league',
   TftMatch = 'tft.match',
   TftSpectator = 'tft.spectator',
   TftSummoner = 'tft.summoner',
+  ValConsoleMatch = 'val.consoleMatch',
+  ValContent = 'val.content',
+  ValMatch = 'val.match',
+  ValRanked = 'val.ranked',
+  ValStatus = 'val.status',
 }
 
 /**

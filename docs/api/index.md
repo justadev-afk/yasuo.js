@@ -25,6 +25,7 @@ const yasuo = new Yasuo({ key: process.env.RIOT_API_KEY })
 - :material-server-network: **[Status](lol-status.md)** — platform status.
 - :material-account-group: **[Clash](lol-clash.md)** — players, teams, tournaments.
 - :material-medal: **[Challenges](lol-challenges.md)** — config, percentiles, leaderboards, player.
+- :material-tournament: **[Tournament](lol-tournament.md)** — providers, tournaments, codes, lobby events (+ stub).
 
 </div>
 
@@ -36,6 +37,32 @@ const yasuo = new Yasuo({ key: process.env.RIOT_API_KEY })
 - :material-trophy: **[League](tft-league.md)** — entries, apex tiers, rated ladder.
 - :material-sword-cross: **[Match](tft-match.md)** — matches, ids, streaming.
 - :material-eye: **[Spectator](tft-spectator.md)** — live game, featured games.
+
+</div>
+
+## VALORANT — `yasuo.val.*`
+
+Routes by `Shard` (`NA`, `EU`, `AP`, `KR`, …).
+
+<div class="grid cards" markdown>
+
+- :material-book-open-variant: **[Content](val-content.md)** — agents, maps, skins, acts.
+- :material-sword-cross: **[Match](val-match.md)** — match, matchlist, recent, `byPuuid`.
+- :material-controller: **[Console Match](val-console-match.md)** — PlayStation/Xbox matchlist + recent.
+- :material-trophy: **[Ranked](val-ranked.md)** — act leaderboards.
+- :material-server-network: **[Status](val-status.md)** — platform status.
+
+</div>
+
+## Legends of Runeterra — `yasuo.lor.*`
+
+Routes by `RegionGroup` (`AMERICAS`, `ASIA`, `EUROPE`, `SEA`).
+
+<div class="grid cards" markdown>
+
+- :material-sword-cross: **[Match](lor-match.md)** — match ids, match, `byPuuid`.
+- :material-trophy: **[Ranked](lor-ranked.md)** — Master-tier leaderboard.
+- :material-server-network: **[Status](lor-status.md)** — platform status.
 
 </div>
 

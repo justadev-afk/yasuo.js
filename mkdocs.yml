@@ -1,7 +1,8 @@
 site_name: Yasuo
 site_description: >-
   The modern, zero-dependency TypeScript client for the Riot Games API —
-  League of Legends, Teamfight Tactics and the Riot Account API.
+  League of Legends, Teamfight Tactics, VALORANT, Legends of Runeterra,
+  Tournament and the Riot Account API.
 site_url: https://docs.yasuo.gg/
 site_author: justadev-afk
 
@@ -71,11 +72,22 @@ nav:
           - Status: api/lol-status.md
           - Clash: api/lol-clash.md
           - Challenges: api/lol-challenges.md
+          - Tournament: api/lol-tournament.md
       - Teamfight Tactics:
           - Summoner: api/tft-summoner.md
           - League: api/tft-league.md
           - Match: api/tft-match.md
           - Spectator: api/tft-spectator.md
+      - VALORANT:
+          - Content: api/val-content.md
+          - Match: api/val-match.md
+          - Console Match: api/val-console-match.md
+          - Ranked: api/val-ranked.md
+          - Status: api/val-status.md
+      - Legends of Runeterra:
+          - Match: api/lor-match.md
+          - Ranked: api/lor-ranked.md
+          - Status: api/lor-status.md
       - Riot & static:
           - Account: api/riot-account.md
           - Data Dragon: api/data-dragon.md

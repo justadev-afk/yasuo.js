@@ -19,7 +19,13 @@ import {
   type RedisClientLike,
   Region,
   RegionGroup,
+  Shard,
   Tier,
+  TournamentMap,
+  TournamentPickType,
+  TournamentRegion,
+  TournamentSpectatorType,
+  ValQueue,
   Yasuo,
 } from '../src/index'
 
@@ -36,6 +42,23 @@ const yasuo = new Yasuo({
   concurrency: 20,
 })
 void fromString
+
+// --- Per-product API keys ----------------------------------------------------
+
+// Riot recommends a separate product (and key) per game. Map each product to
+// its key and yasuo signs every request with the right one; distinct keys get
+// independent rate-limit budgets. Any product without an entry falls back to the
+// shared `key`, then to RIOT_API_KEY / RIOT_<GAME>_API_KEY env vars.
+const multiKey = new Yasuo({
+  keys: {
+    lol: process.env.RIOT_LOL_KEY,
+    tft: process.env.RIOT_TFT_KEY,
+    val: process.env.RIOT_VAL_KEY,
+    lor: process.env.RIOT_LOR_KEY,
+  },
+  key: process.env.RIOT_API_KEY, // shared fallback (e.g. for the Account API)
+})
+void multiKey
 
 // --- The result IS the entity: .error + .http live on it ---------------------
 
@@ -137,6 +160,71 @@ async function tft(): Promise<void> {
   console.log(summoner.puuid, match.metadata?.match_id)
 }
 
+// --- VALORANT (routes by Shard) ----------------------------------------------
+
+async function valorant(): Promise<void> {
+  const content = await yasuo.val.content.get(Shard.NA).execute()
+  if (!content.error) {
+    console.log(content.version, content.activeAct()?.name)
+  }
+
+  // A matchlist is relation-aware: fetch a full match on the same shard.
+  const list = await yasuo.val.match.matchlist('puuid', Shard.NA).execute()
+  const firstId = list.matchIds()[0]
+  if (firstId) {
+    const match = await list.match(firstId).execute()
+    console.log(match.winningTeam()?.teamId)
+  }
+
+  const recent = await yasuo.val.match.recent(ValQueue.COMPETITIVE, Shard.NA).execute()
+  const board = await yasuo.val.ranked.leaderboard('act-id', Shard.NA, { size: 10 }).execute()
+  const status = await yasuo.val.status.get(Shard.NA).execute()
+  console.log(recent.matchIds.length, board.top(3).length, status.hasActiveIssues())
+}
+
+// --- Legends of Runeterra (routes by RegionGroup) ----------------------------
+
+async function legendsOfRuneterra(): Promise<void> {
+  const matches = await yasuo.lor.match.byPuuid('puuid', RegionGroup.AMERICAS).execute()
+  const board = await yasuo.lor.ranked.leaderboard(RegionGroup.AMERICAS).execute()
+  const status = await yasuo.lor.status.get(RegionGroup.AMERICAS).execute()
+  console.log(matches.length, board.top(3).length, status.hasActiveIssues())
+}
+
+// --- Tournament-V5 (POST flow; use `tournamentStub` without a production key) -
+
+async function tournament(): Promise<void> {
+  const stub = yasuo.lol.tournamentStub
+  const provider = await stub
+    .registerProvider(
+      { region: TournamentRegion.NA, url: 'https://cb.example' },
+      RegionGroup.AMERICAS,
+    )
+    .execute()
+  if (provider.error || provider.value === null) {
+    return
+  }
+  const tournamentId = await stub
+    .registerTournament({ providerId: provider.value, name: 'My Cup' }, RegionGroup.AMERICAS)
+    .execute()
+  if (tournamentId.error || tournamentId.value === null) {
+    return
+  }
+  const codes = await stub
+    .createCodes(
+      {
+        mapType: TournamentMap.SUMMONERS_RIFT,
+        pickType: TournamentPickType.TOURNAMENT_DRAFT,
+        spectatorType: TournamentSpectatorType.ALL,
+        teamSize: 5,
+      },
+      RegionGroup.AMERICAS,
+      { tournamentId: tournamentId.value, count: 2 },
+    )
+    .execute()
+  console.log([...codes])
+}
+
 // --- Data Dragon (no key, no rate limit — returns raw payloads) --------------
 
 async function staticData(): Promise<void> {
@@ -212,11 +300,14 @@ async function safeLookup(): Promise<void> {
 }
 
 export {
+  legendsOfRuneterra,
   resultShape,
   safeLookup,
   staticData,
   streamLadder,
   tft,
+  tournament,
+  valorant,
   walkAccount,
   withCloudflareKV,
   withMiddleware,

@@ -47,7 +47,8 @@ Every field on `YasuoConfig` is optional and comes with a production-safe defaul
 
 | Option | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `key` | `string` | `RIOT_API_KEY` env var | Your Riot API key. |
+| `key` | `string` | `RIOT_API_KEY` env var | Your shared Riot API key. |
+| `keys` | `ApiKeyMap` | — | Per-product keys (`{ lol, tft, val, lor, riot }`); each falls back to `key`. See below. |
 | `baseUrl` | `string` | Riot's host | URL template with `{routing}`/`{game}` placeholders; override to route through a proxy. |
 | `rateLimit` | `boolean \| RateLimiterOptions` | `false` | Proactive limiter, **off by default**; pass `true` to enable it (reactive retries stay on regardless). |
 | `retry` | `boolean \| RetryOptions` | `true` | Reactive retry policy for `429`/`503` (3 attempts, `retry-after`-aware). |
@@ -66,6 +67,24 @@ const yasuo = new Yasuo({
   logLevel: LogLevel.INFO,
 })
 ```
+
+### Per-product API keys
+
+Riot recommends registering a **separate product — and key — per game**. Pass a `keys` map and yasuo signs every request with the key for that request's product; distinct keys keep **independent rate-limit budgets**. Anything omitted falls back to the shared `key`, then to environment variables:
+
+```ts
+const yasuo = new Yasuo({
+  keys: {
+    lol: process.env.RIOT_LOL_KEY,
+    tft: process.env.RIOT_TFT_KEY,
+    val: process.env.RIOT_VAL_KEY,
+    lor: process.env.RIOT_LOR_KEY,
+  },
+  key: process.env.RIOT_API_KEY, // shared fallback (e.g. for the Account API)
+})
+```
+
+Resolution order per request: `keys[game]` → `RIOT_<GAME>_API_KEY` env → shared `key` → `RIOT_API_KEY` env. The Account API borrows any configured product key when it has none of its own. A single `key` still works exactly as before.
 
 ## 4. Your first request
 

@@ -1,8 +1,8 @@
 # Yasuo.js
 
-**A modern, zero-dependency TypeScript client for the Riot Games API** — League of Legends, Teamfight Tactics and the Riot Account API.
+**A modern, zero-dependency TypeScript client for the Riot Games API** — **complete coverage** of League of Legends, Teamfight Tactics, VALORANT, Legends of Runeterra, Tournament and the Riot Account API.
 
-Yasuo is the evolution of [twisted](https://www.npmjs.com/package/twisted). It keeps everything that made twisted pleasant — a single client, typed responses, rate-limit info attached to every result — and rebuilds it around a Supabase-style **query builder**, lazy relation-aware chaining, a pluggable cache, a leveled logger and async iterators, all with **no runtime dependencies**.
+Yasuo is the evolution of [twisted](https://www.npmjs.com/package/twisted). It keeps everything that made twisted pleasant — a single client, typed responses, rate-limit info attached to every result — and rebuilds it around a Supabase-style **query builder**, lazy relation-aware chaining, a pluggable cache, a leveled logger and async iterators, all with **no runtime dependencies**. It wraps **100% of the key-authenticated Riot API surface**, and lets you sign each product with its own API key.
 
 > **🎮 Live demo — [www.yasuo.gg](https://www.yasuo.gg)** · [source on GitHub](https://github.com/justadev-afk/yasuo.gg)
 >
@@ -46,6 +46,8 @@ console.log(matches.http.rateLimits.app)  // rate-limit budget travels with ever
 | Caching | — | in-memory (`node-cache`) | pluggable **in-memory / Redis** cache |
 | Logging | — | — | leveled logger (`debug`/`info`/`warn`/`error`), env-driven |
 | Magic strings | some | strings (`'euw1'`, …) | **none** — everything is an enum |
+| Riot API coverage | LoL · TFT · Account | LoL only | **LoL · TFT · VALORANT · LoR · Tournament · Account** — 100% of the key-auth surface |
+| API keys | one key | one key | **one key, or one per product** (Riot's recommendation) — routed automatically |
 | Module format | CJS | CJS | **dual ESM + CJS**, single-file |
 
 ---
@@ -84,10 +86,52 @@ const account  = await yasuo.riot.account.byRiotId('Faker', 'KR1', RegionGroup.A
 
 The client is organised by product, matching Riot's routing model:
 
-- `yasuo.lol.*` — Summoner, League, Champion Mastery, Champion, Match, Spectator, Status, Clash, Challenges
+- `yasuo.lol.*` — Summoner, League, Champion Mastery, Champion, Match, Spectator, Status, Clash, Challenges, Tournament (+ Tournament Stub)
 - `yasuo.tft.*` — Summoner, League, Match, Spectator
+- `yasuo.val.*` — Content, Match, Console Match, Ranked, Status (routes by `Shard`)
+- `yasuo.lor.*` — Match, Ranked, Status
 - `yasuo.riot.account` — the shared Account API (game name / tag line → PUUID)
 - `yasuo.dataDragon` — Riot's static data CDN (no key, no rate limits)
+
+### Per-product API keys
+
+Riot recommends registering a **separate product — and key — per game**. Pass a `keys` map and yasuo signs every request with the key for that request's product, automatically; distinct keys get **independent rate-limit budgets**. Anything omitted falls back to the shared `key`, then to environment variables.
+
+```ts
+const yasuo = new Yasuo({
+  keys: {
+    lol: process.env.RIOT_LOL_KEY,
+    tft: process.env.RIOT_TFT_KEY,
+    val: process.env.RIOT_VAL_KEY,
+    lor: process.env.RIOT_LOR_KEY,
+  },
+  key: process.env.RIOT_API_KEY, // shared fallback (e.g. for the Account API)
+})
+
+await yasuo.val.content.get(Shard.NA).execute()   // signed with the VAL key
+await yasuo.lol.summoner.byPuuid(puuid, Region.KR).execute() // signed with the LoL key
+```
+
+Resolution order per request: `keys[game]` → `RIOT_<GAME>_API_KEY` env → shared `key` → `RIOT_API_KEY` env. The Account API borrows any configured product key when it has none of its own. A single `key` (or `new Yasuo(process.env.RIOT_API_KEY)`) still works exactly as before.
+
+### VALORANT, Legends of Runeterra & Tournaments
+
+```ts
+import { Yasuo, Shard, RegionGroup, ValQueue } from 'yasuo.js'
+
+// VALORANT routes by Shard; a matchlist is relation-aware.
+const list  = await yasuo.val.match.matchlist(puuid, Shard.NA).execute()
+const match = await list.match(list.matchIds()[0]).execute()
+const board = await yasuo.val.ranked.leaderboard(actId, Shard.NA, { size: 10 }).execute()
+
+// Legends of Runeterra routes by RegionGroup.
+const lorMatches = await yasuo.lor.match.byPuuid(puuid, RegionGroup.AMERICAS).execute()
+
+// Tournament-V5 (POST flow) — or `tournamentStub` with no production key:
+const provider = await yasuo.lol.tournamentStub
+  .registerProvider({ region: 'NA', url: 'https://cb.example' }, RegionGroup.AMERICAS)
+  .execute()
+```
 
 ### Query builders + the result model
 
@@ -266,12 +310,16 @@ See [the error-handling guide](https://docs.yasuo.gg/errors/).
 
 ## API coverage
 
-**51 endpoints** across every current Riot product:
+**100% of the key-authenticated Riot Games API** — every product, every endpoint a Riot API key can call. **74 endpoints**:
 
-- **LoL** (33): Summoner · League (+ league-exp) · Champion Mastery · Champion Rotation · Match-V5 · Spectator · Status · Clash · Challenges
+- **LoL** (44): Summoner · League (+ league-exp) · Champion Mastery · Champion Rotation · Match-V5 · Spectator · Status · Clash · Challenges · **Tournament-V5** · **Tournament-Stub-V5**
 - **TFT** (14): Summoner · League (+ rated ladder) · Match · Spectator
+- **VALORANT** (8): Content · Match · Console Match · Ranked · Status
+- **Legends of Runeterra** (4): Match · Ranked · Status
 - **Riot** (4): Account (by PUUID / by Riot ID) · Active Shard · Active Region
 - **Data Dragon**: versions, champions, runes, static reference data
+
+The only Riot endpoints not wrapped are the **RSO/OAuth-gated** ones (LoR Deck & Inventory, RSO Match), which require a user-authorization flow rather than an API key.
 
 See [the endpoint map](https://docs.yasuo.gg/endpoints/) for the full list.
 
@@ -314,7 +362,7 @@ bun run build         # single-file ESM + CJS + d.ts
 bun run docs:serve    # preview the MkDocs site locally
 ```
 
-Unit tests run network-free (inject `MockHttpClient` or a fake `HttpClient`/`fetch`) and are **coverage-gated at 95% line/statement** coverage (currently ~97.5%) via `bunfig.toml`. Conventions for contributors (folder layout, one-declaration-per-file, enum rules) live in [the architecture guide](https://docs.yasuo.gg/architecture/).
+Unit tests run network-free (inject `MockHttpClient` or a fake `HttpClient`/`fetch`) and are **coverage-gated at 95% line/statement** coverage (currently ~98%) via `bunfig.toml`. Conventions for contributors (folder layout, one-declaration-per-file, enum rules) live in [the architecture guide](https://docs.yasuo.gg/architecture/).
 
 ## License
 

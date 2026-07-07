@@ -9,6 +9,7 @@ import type { EntityContext } from '../entities/entity-context'
 import { ValueResult } from '../entities/value-result'
 import type { CacheNamespace } from '../enums/cache-namespace'
 import { type Region, type RegionGroup, regionToRegionGroup } from '../enums/region'
+import type { Shard } from '../enums/valorant'
 import { ApiError } from '../errors'
 import { CollectionQuery } from '../query/collection-query'
 import type { ExecuteOptions } from '../query/execute-options'
@@ -94,6 +95,11 @@ export abstract class BaseNamespace {
   /** Build an {@link EntityContext} for a platform-region-scoped resource. */
   protected regionContext(region: Region): EntityContext {
     return { client: this.client, region, regionGroup: regionToRegionGroup(region) }
+  }
+
+  /** Build an {@link EntityContext} for a VALORANT shard-scoped resource. */
+  protected shardContext(shard: Shard): EntityContext {
+    return { client: this.client, shard }
   }
 
   /**

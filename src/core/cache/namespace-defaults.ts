@@ -22,8 +22,17 @@ export const DEFAULT_NAMESPACE_TTL_MS: Record<CacheNamespace, number> = {
   [CacheNamespace.LolStatus]: 120_000, // 2m — platform incidents
   [CacheNamespace.LolClash]: 300_000, // 5m — tournament schedule / registration
   [CacheNamespace.LolChallenges]: 600_000, // 10m — challenge progress + static config
+  [CacheNamespace.LolTournament]: 60_000, // 1m — code lookups / lobby events
   [CacheNamespace.TftSummoner]: 300_000, // 5m
   [CacheNamespace.TftLeague]: 60_000, // 1m
   [CacheNamespace.TftMatch]: 3_600_000, // 1h — immutable
   [CacheNamespace.TftSpectator]: 10_000, // 10s — live games
+  [CacheNamespace.ValContent]: 3_600_000, // 1h — content changes on patch
+  [CacheNamespace.ValMatch]: 3_600_000, // 1h — finished matches are immutable
+  [CacheNamespace.ValConsoleMatch]: 3_600_000, // 1h — immutable
+  [CacheNamespace.ValRanked]: 300_000, // 5m — act leaderboards
+  [CacheNamespace.ValStatus]: 120_000, // 2m — platform incidents
+  [CacheNamespace.LorMatch]: 3_600_000, // 1h — immutable
+  [CacheNamespace.LorRanked]: 300_000, // 5m — leaderboard
+  [CacheNamespace.LorStatus]: 120_000, // 2m — platform incidents
 }

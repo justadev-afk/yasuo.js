@@ -6,8 +6,10 @@
  */
 
 export type {
+  ApiKeyMap,
   CacheOptions,
   NamespaceCacheOptions,
+  ResolvedApiKeys,
   ResolvedCacheOptions,
   ResolvedNamespaceCache,
   ResolvedRetryOptions,
@@ -64,8 +66,11 @@ export * from './dto'
 export {
   type Endpoint,
   LOL_ENDPOINTS,
+  LOR_ENDPOINTS,
   RIOT_ENDPOINTS,
   TFT_ENDPOINTS,
+  TOURNAMENT_ENDPOINTS,
+  VAL_ENDPOINTS,
 } from './endpoints'
 // Entities (rich responses with lazy relations)
 export * from './entities'
