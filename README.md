@@ -4,9 +4,9 @@
 
 Yasuo is the evolution of [twisted](https://www.npmjs.com/package/twisted). It keeps everything that made twisted pleasant — a single client, typed responses, rate-limit info attached to every result — and rebuilds it around a Supabase-style **query builder**, lazy relation-aware chaining, a pluggable cache, a leveled logger and async iterators, all with **no runtime dependencies**. It wraps **100% of the key-authenticated Riot API surface**, and lets you sign each product with its own API key.
 
-> **🎮 Live demo — [www.yasuo.gg](https://www.yasuo.gg)** · [source on GitHub](https://github.com/justadev-afk/yasuo.gg)
+> **🎮 Live demo — [www.yasuo.gg](https://www.yasuo.gg)**
 >
-> An open-source League of Legends summoner-profile site — profiles, ranked, match history, champion mastery and a public JSON API — built **entirely** on this library, running on Cloudflare Workers. Live proof yasuo works in a real app.
+> A League of Legends summoner-profile site — profiles, ranked, match history, champion mastery and a public JSON API — built **entirely** on this library, running on Cloudflare Workers. Live proof yasuo works in a real app.
 
 ```ts
 import { Yasuo, Region, RegionGroup } from 'yasuo.js'
@@ -343,8 +343,7 @@ Full docs live at **<https://docs.yasuo.gg/>**:
 
 - [**yasuo.gg**](https://yasuo.gg) — a complete League of Legends summoner-profile
   site and public JSON API, built entirely on yasuo and running on Cloudflare
-  Workers. A real, end-to-end demonstration that the library works
-  ([source](https://github.com/justadev-afk/yasuo.gg)).
+  Workers. A real, end-to-end demonstration that the library works.
 
 ## Migrating from twisted
 
