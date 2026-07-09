@@ -19,6 +19,8 @@ export interface CurrentGameParticipantDTO {
   readonly spell2Id: number
   readonly teamId: number
   readonly bot: boolean
+  /** Index of the skin the player last selected. Returned live but undocumented by Riot. */
+  readonly lastSelectedSkinIndex?: number
   readonly gameCustomizationObjects: GameCustomizationObjectDTO[]
   /** Encrypted PUUID. Absent/null when the player is anonymised. */
   readonly puuid?: string

@@ -108,6 +108,8 @@ export interface MatchParticipantDTO {
   readonly teamId: number
   readonly championId: number
   readonly championName: string
+  /** Skin id the champion was played with. Absent in some older/mode-specific payloads. */
+  readonly championSkinId?: number
   /** Kayn transform: 0 none, 1 slayer, 2 assassin. */
   readonly championTransform: number
   readonly champLevel: number
@@ -116,6 +118,8 @@ export interface MatchParticipantDTO {
   readonly profileIcon: number
   readonly riotIdGameName?: string
   readonly riotIdTagline?: string
+  /** @deprecated Pre-14.5 name for {@link riotIdGameName}; no longer returned by current patches. */
+  readonly riotIdName?: string
   /** @deprecated Use {@link riotIdGameName}/{@link riotIdTagline}. */
   readonly summonerName?: string
   /** @deprecated Use {@link puuid}. */
@@ -248,6 +252,24 @@ export interface MatchParticipantDTO {
   readonly challenges?: ChallengesDTO
   readonly missions?: MissionsDTO
   readonly PlayerBehavior?: ParticipantPlayerBehaviorDTO
+
+  /**
+   * Flat, PascalCase duplicate of the {@link MissionsDTO} `playerScore*` values,
+   * still emitted at the top level of each participant by the live API in modes
+   * that carry missions (URF, Arena, …). Prefer {@link missions}.
+   */
+  readonly PlayerScore0?: number
+  readonly PlayerScore1?: number
+  readonly PlayerScore2?: number
+  readonly PlayerScore3?: number
+  readonly PlayerScore4?: number
+  readonly PlayerScore5?: number
+  readonly PlayerScore6?: number
+  readonly PlayerScore7?: number
+  readonly PlayerScore8?: number
+  readonly PlayerScore9?: number
+  readonly PlayerScore10?: number
+  readonly PlayerScore11?: number
 
   // Arena (Cherry) only
   readonly placement?: number

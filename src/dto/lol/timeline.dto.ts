@@ -111,6 +111,8 @@ export interface TimelineEventDTO {
   readonly multiKillLength?: number
   readonly victimDamageDealt?: TimelineVictimDamageDTO[]
   readonly victimDamageReceived?: TimelineVictimDamageDTO[]
+  readonly victimTeamfightDamageDealt?: TimelineVictimDamageDTO[]
+  readonly victimTeamfightDamageReceived?: TimelineVictimDamageDTO[]
   readonly laneType?: string
   readonly teamId?: number
   readonly killerTeamId?: number

@@ -70,6 +70,12 @@ export interface TftParticipantDTO {
   readonly partner_group_id?: number
   /** Mode-specific mission scores (flat map, all optional). */
   readonly missions?: Record<string, number>
+  /** Hero-augment / skill-tree picks (id → level). Present in some modes. */
+  readonly skill_tree?: Record<string, number>
+  /** PvE score (PvE game modes only, e.g. Tocker's Trials). */
+  readonly pve_score?: number
+  /** Whether the player won their PvE run (PvE game modes only). */
+  readonly pve_wonrun?: boolean
   readonly riotIdGameName?: string
   readonly riotIdTagline?: string
 }
