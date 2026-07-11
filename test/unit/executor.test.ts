@@ -200,7 +200,7 @@ describe('RequestExecutor cache control', () => {
       key: 'RGAPI-test',
       httpClient: http,
       rateLimit: false,
-      cache: { store, namespaces: { 'lol.spectator': { enabled: false } } },
+      cache: { store, namespaces: { lol: { spectator: { enabled: false } } } },
     })
     const opts = { pathParams: { puuid: 'p' }, cacheNamespace: CacheNamespace.LolSpectator }
     await executor.request('KR', SUMMONER, opts)
@@ -216,7 +216,7 @@ describe('RequestExecutor cache control', () => {
       key: 'RGAPI-test',
       httpClient: http,
       rateLimit: false,
-      cache: { store, namespaces: { 'lol.spectator': { enabled: false } } },
+      cache: { store, namespaces: { lol: { spectator: { enabled: false } } } },
     })
     const opts = {
       pathParams: { puuid: 'p' },

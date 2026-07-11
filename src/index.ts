@@ -8,10 +8,8 @@
 export type {
   ApiKeyMap,
   CacheOptions,
-  NamespaceCacheOptions,
   ResolvedApiKeys,
   ResolvedCacheOptions,
-  ResolvedNamespaceCache,
   ResolvedRetryOptions,
   RetryOptions,
   YasuoConfig,
@@ -21,6 +19,10 @@ export { Yasuo } from './client/yasuo'
 // Caching
 export {
   type CachedResult,
+  type CacheLevelOptions,
+  type CacheMethod,
+  type CacheProduct,
+  type CacheService,
   type CacheStore,
   type CacheStoreLike,
   coerceCacheStore,
@@ -29,9 +31,12 @@ export {
   type KVNamespaceLike,
   MemoryCache,
   type MemoryCacheOptions,
+  type NamespacesCacheConfig,
+  type ProductCacheConfig,
   RedisCache,
   type RedisCacheOptions,
   type RedisClientLike,
+  type ServiceCacheConfig,
 } from './core/cache'
 // HTTP transport (custom clients)
 export {

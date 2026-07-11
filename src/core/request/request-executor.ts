@@ -1,7 +1,7 @@
 import {
+  DEFAULT_CACHE_TTL_MS,
   type ResolvedApiKeys,
   type ResolvedCacheOptions,
-  type ResolvedNamespaceCache,
   type ResolvedRetryOptions,
   resolveApiKeys,
   resolveBaseUrl,
@@ -18,7 +18,7 @@ import type { CacheNamespace } from '../../enums/cache-namespace'
 import { HttpHeader, HttpMethod, HttpStatus } from '../../enums/http'
 import { ApiError, ApiKeyMissingError, apiErrorFromStatus } from '../../errors'
 import type { ExecuteCacheOptions } from '../../query/execute-options'
-import type { CacheStore } from '../cache'
+import { type CacheStore, resolveScopedCache } from '../cache'
 import { FetchHttpClient, type HttpClient, type HttpResponse } from '../http/http-client'
 import { composeMiddleware, type HttpMiddleware, type MiddlewareContext } from '../http/middleware'
 import type { Logger } from '../logger'
@@ -146,11 +146,16 @@ export class RequestExecutor {
       options.query,
     )
 
-    const cacheControl = this.resolveCacheControl(options, method)
+    const cacheControl = this.resolveCacheControl(options, endpoint, method)
+    const cacheKey = cacheControl.prefix + url
     if (this.cache && cacheControl.read) {
-      const cached = await this.cache.get(url)
+      const cached = await this.cache.get(cacheKey)
       if (cached) {
-        this.logger.debug(`cache hit ${url}`)
+        if (cached.notFound) {
+          this.logger.debug(`cache hit (not-found) ${cacheKey}`)
+          throw notFoundFromCache(cached.meta, url, endpoint.id)
+        }
+        this.logger.debug(`cache hit ${cacheKey}`)
         return cached as Fetched<T>
       }
     }
@@ -201,7 +206,7 @@ export class RequestExecutor {
       if (response.ok) {
         const result: Fetched<T> = { data: response.body as T, meta }
         if (this.cache && cacheControl.write && cacheControl.ttlMs > 0) {
-          await this.cache.set(url, result, cacheControl.ttlMs)
+          await this.cache.set(cacheKey, result, cacheControl.ttlMs)
         }
         return result
       }
@@ -225,6 +230,21 @@ export class RequestExecutor {
         )
         await sleep(waitMs)
         continue
+      }
+
+      // Negative-cache a not-found so a repeated lookup of a non-existent resource
+      // costs no request (disabled for live-game namespaces, whose 404 flips fast).
+      if (
+        response.status === HttpStatus.NOT_FOUND &&
+        this.cache &&
+        cacheControl.write &&
+        cacheControl.negativeTtlMs > 0
+      ) {
+        await this.cache.set(
+          cacheKey,
+          { data: null, meta, notFound: true },
+          cacheControl.negativeTtlMs,
+        )
       }
 
       this.logger.error(`request failed (${response.status}) ${url}`)
@@ -271,9 +291,10 @@ export class RequestExecutor {
   }
 
   /**
-   * Resolve whether this request should read from and/or write to the cache,
-   * and with what TTL — folding the namespace's configured settings with the
-   * per-call `execute({ cache })` override.
+   * Resolve whether this request should read from and/or write to the cache, with
+   * what positive/negative TTL and key prefix — folding the per-scope
+   * (product/service/method) settings ({@link resolveScopedCache}) with the per-call
+   * `execute({ cache })` override.
    *
    * A per-call `false`/`{ enabled: false }` skips the **read** only: the fresh
    * response is still written back (a force-refresh). `true`/`{ enabled: true }`
@@ -281,24 +302,23 @@ export class RequestExecutor {
    */
   private resolveCacheControl(
     options: RequestOptions,
+    endpoint: Endpoint,
     method: HttpMethod,
   ): {
     read: boolean
     write: boolean
     ttlMs: number
+    negativeTtlMs: number
+    prefix: string
   } {
     // Only GET responses are cacheable; POST/PUT are always fresh.
     if (!this.cache || method !== HttpMethod.GET) {
-      return { read: false, write: false, ttlMs: 0 }
+      return { read: false, write: false, ttlMs: 0, negativeTtlMs: 0, prefix: '' }
     }
-    const nsKey = options.cacheNamespace
-    const base: ResolvedNamespaceCache =
-      nsKey !== undefined
-        ? this.cacheOptions.namespaces[nsKey]
-        : { enabled: this.cacheOptions.enabled, ttlMs: this.cacheOptions.ttlMs }
-    let read = base.enabled
-    let write = base.enabled
-    let ttlMs = base.ttlMs
+    const scoped = this.resolveScope(options.cacheNamespace, endpoint.id)
+    let read = scoped.enabled
+    let write = scoped.enabled
+    let ttlMs = scoped.ttlMs
     const override = options.cache
     if (override === true) {
       read = true
@@ -316,8 +336,48 @@ export class RequestExecutor {
         ttlMs = override.ttlMs
       }
     }
-    return { read, write, ttlMs }
+    return { read, write, ttlMs, negativeTtlMs: scoped.negativeTtlMs, prefix: scoped.prefix }
   }
+
+  /**
+   * Resolve the effective `{ enabled, ttlMs, negativeTtlMs, prefix }` for a request
+   * from its namespace + the endpoint's method token (the `endpoint.id` suffix after
+   * the namespace). Falls back to the global defaults when the request has no
+   * namespace scope (rare — every namespaced call carries one).
+   */
+  private resolveScope(namespace: CacheNamespace | undefined, endpointId: string) {
+    const globals = {
+      enabled: this.cacheOptions.enabled,
+      ttlMs: this.cacheOptions.ttlMs,
+      prefix: this.cacheOptions.prefix,
+      negativeTtlMs: this.cacheOptions.negativeTtlMs,
+    }
+    if (namespace === undefined) {
+      return {
+        enabled: globals.enabled,
+        ttlMs: globals.ttlMs ?? DEFAULT_CACHE_TTL_MS,
+        negativeTtlMs: globals.negativeTtlMs ?? 0,
+        prefix: globals.prefix,
+      }
+    }
+    const token = endpointId.startsWith(`${namespace}.`)
+      ? endpointId.slice(namespace.length + 1)
+      : ''
+    return resolveScopedCache(globals, this.cacheOptions.namespaces, namespace, token)
+  }
+}
+
+/** Reconstruct the {@link NotFoundError} a negative-cache hit stands in for. */
+function notFoundFromCache(meta: ResponseMeta, url: string, method: string): ApiError {
+  return apiErrorFromStatus({
+    status: HttpStatus.NOT_FOUND,
+    url,
+    method,
+    rateLimits: meta.rateLimits ?? EMPTY_RATE_LIMITS,
+    body: null,
+    headers: meta.headers ?? {},
+    response: null,
+  })
 }
 
 /** Wrap a transport/network failure into an {@link ApiError} with status `0`. */

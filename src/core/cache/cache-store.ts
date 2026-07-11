@@ -4,6 +4,13 @@ import type { ResponseMeta } from '../../dto/common.dto'
 export interface CachedResult {
   readonly data: unknown
   readonly meta: ResponseMeta
+  /**
+   * When `true`, this entry **negative-caches** a not-found (`404`): `data` is
+   * `null` and, on a cache hit, the executor reconstructs and throws the
+   * `NotFoundError` instead of returning a payload — so a repeated lookup of a
+   * non-existent resource costs no request. Absent on ordinary (positive) entries.
+   */
+  readonly notFound?: boolean
 }
 
 /**

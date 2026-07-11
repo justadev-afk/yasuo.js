@@ -468,21 +468,36 @@ requests independently of pacing.
 ## Caching (opt-in, off by default)
 
 Served **before the rate limiter** — a hit is instant and costs no quota. Keyed by
-resolved URL. Only 2xx responses are stored. Each namespace has a tuned default TTL.
+(prefixed) resolved URL. 2xx responses are stored; a **`404` is negative-cached** so a
+repeat resolves the same `NotFoundError` with no request (off for live-game/spectator).
+Each namespace has a tuned default TTL.
 
 ```ts
 new Yasuo({ key, cache: true })                         // in-memory, per-namespace TTLs
 new Yasuo({ key, cache: { ttlMs: 30_000 } })            // blanket 30s
-new Yasuo({ key, cache: { namespaces: {
-  'lol.match': { ttlMs: 86_400_000 },                   // immutable — a full day
-  'lol.spectator': { enabled: false },                  // never cache live games
-} } })
+new Yasuo({ key, cache: {
+  prefix: 'yjs:',
+  namespaces: {                                         // nested product → service → method
+    lol: {
+      prefix: 'lol:',
+      match: { ttlMs: 86_400_000, prefix: 'm:' },       // immutable — a full day
+      summoner: { byPuuid: { ttlMs: 600_000 } },        // per-method override
+      spectator: { enabled: false },                    // never cache live games
+    },
+    riot: { account: { negativeTtlMs: 3_600_000 } },    // cache "no such Riot ID" 1h
+  },
+} })
 ```
 
-`CacheOptions`: `{ enabled?, store?, ttlMs?, namespaces? }`. `store` accepts a
-`CacheStore`, or a raw Redis client / Cloudflare KV binding (auto-wrapped in
-`RedisCache`/`KVCache`). Per-call override: `execute({ cache })` (see the execution
-table). Default TTLs: `riot.account` 1h, `lol.champion`/`lol.match`/`tft.match`/`val.match`/`val.consoleMatch`/`val.content`/`lor.match` 1h,
+`CacheOptions`: `{ enabled?, store?, ttlMs?, prefix?, negativeTtlMs?, namespaces? }`.
+`namespaces` is a nested, `keyof`-derived `product → service → method` tree; every scope
+takes `CacheLevelOptions` (`{ enabled?, ttlMs?, prefix?, negativeTtlMs? }`) — most
+specific wins for enabled/ttl/negativeTtl, `prefix` composes down the tree. Method keys
+mirror the `endpoint.id` suffix. `store` accepts a `CacheStore`, or a raw Redis client /
+Cloudflare KV binding (auto-wrapped in `RedisCache`/`KVCache`). Per-call override:
+`execute({ cache })` (see the execution table). Default TTLs (positive; negative defaults
+to the same, or 0 for spectator): `riot.account` 1h,
+`lol.champion`/`lol.match`/`tft.match`/`val.match`/`val.consoleMatch`/`val.content`/`lor.match` 1h,
 `lol.summoner`/`tft.summoner`/`lol.clash`/`lol.mastery`/`val.ranked`/`lor.ranked` 5min,
 `lol.status`/`val.status`/`lor.status` 2min, `lol.league`/`tft.league` 1min,
 `lol.challenges` 10min, `lol.tournament` 1min, spectator 10s.
@@ -605,9 +620,9 @@ DTOs (`*DTO`, raw wire shapes) and entities (`*Entity`) are all exported too.
 
 ## Full public surface (`import { … } from 'yasuo.js'`)
 
-- Client: `Yasuo`. Config types: `YasuoConfig`, `ApiKeyMap`, `RetryOptions`, `CacheOptions`, `NamespaceCacheOptions`, `Resolved*` (incl. `ResolvedApiKeys`).
+- Client: `Yasuo`. Config types: `YasuoConfig`, `ApiKeyMap`, `RetryOptions`, `CacheOptions`, `Resolved*` (incl. `ResolvedApiKeys`).
 - Query: `SingleQuery`, `CollectionQuery`; types `ExecuteOptions`, `ExecuteCacheOptions`, `QueryRunner`.
-- Caching: `MemoryCache`, `RedisCache`, `KVCache`, `coerceCacheStore`; types `CacheStore`, `CacheStoreLike`, `CachedResult`, `*CacheOptions`, `RedisClientLike`, `KVNamespaceLike`.
+- Caching: `MemoryCache`, `RedisCache`, `KVCache`, `coerceCacheStore`; types `CacheStore`, `CacheStoreLike`, `CachedResult`, `*CacheOptions`, `CacheLevelOptions`, `NamespacesCacheConfig`, `ProductCacheConfig`, `ServiceCacheConfig`, `CacheProduct`, `CacheService`, `CacheMethod`, `RedisClientLike`, `KVNamespaceLike`.
 - HTTP: `FetchHttpClient`; types `HttpClient`, `HttpRequest`, `HttpResponse`.
 - Middleware: `composeMiddleware`; types `HttpMiddleware`, `HttpHandler`, `MiddlewareContext`.
 - Logging: `LogLevel`, `createConsoleLogger`, `noopLogger`, `parseLogLevel`, `resolveLogLevel`; type `Logger`.

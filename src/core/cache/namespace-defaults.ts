@@ -36,3 +36,15 @@ export const DEFAULT_NAMESPACE_TTL_MS: Record<CacheNamespace, number> = {
   [CacheNamespace.LorRanked]: 300_000, // 5m — leaderboard
   [CacheNamespace.LorStatus]: 120_000, // 2m — platform incidents
 }
+
+/**
+ * Live-game (spectator) namespaces. Their **not-found** (a `404` = "not in a
+ * game") flips the moment a player starts a match, so negative caching is off for
+ * them by default (`negativeTtlMs` defaults to `0`) — unlike every other namespace,
+ * whose not-founds are negative-cached. Positive caching is unaffected (still the
+ * 10s default above). Callers can still opt in explicitly per scope.
+ */
+export const LIVE_GAME_NAMESPACES: ReadonlySet<CacheNamespace> = new Set([
+  CacheNamespace.LolSpectator,
+  CacheNamespace.TftSpectator,
+])

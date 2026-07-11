@@ -32,15 +32,27 @@ const yasuo = new Yasuo({
 })
 ```
 
-To keep the tuned defaults but override just a few namespaces, use `namespaces`:
+To keep the tuned defaults but override just a few scopes, use `namespaces` — a
+**nested `product → service → method` tree** whose keys autocomplete from the real
+client surface (a typo is a type error). Every level accepts the same knobs
+(`enabled`, `ttlMs`, `prefix`, `negativeTtlMs`); a more specific scope wins, and
+`prefix` **composes** down the tree:
 
 ```ts
 const yasuo = new Yasuo({
   key,
   cache: {
+    prefix: 'yjs:',
     namespaces: {
-      'lol.match': { ttlMs: 86_400_000 }, // finished matches are immutable — cache a full day
-      'lol.spectator': { enabled: false }, // never cache live games
+      lol: {
+        prefix: 'lol:',
+        match: { ttlMs: 86_400_000, prefix: 'm:' }, // immutable — cache a full day
+        summoner: { byPuuid: { ttlMs: 600_000 } },  // per-method override
+        spectator: { enabled: false },              // never cache live games
+      },
+      riot: {
+        account: { negativeTtlMs: 3_600_000 },      // cache "no such Riot ID" for an hour
+      },
     },
   },
 })
@@ -52,8 +64,19 @@ const yasuo = new Yasuo({
 | --------- | ------------ | ---------------------- | ------------------------------------------------------------------ |
 | `enabled` | `boolean`    | `true` when an object is given | Master switch. Set `false` to disable without removing the config. |
 | `store`   | `CacheStoreLike` | a new `MemoryCache` | Backing store: a `CacheStore`, or a raw Redis client / Cloudflare KV namespace (auto-wrapped in `RedisCache`/`KVCache`). |
-| `ttlMs`   | `number`     | per-namespace default  | **Blanket** TTL (ms) for every namespace, overriding their built-in defaults. Omit to keep each namespace's tuned default. |
-| `namespaces` | `Partial<Record<CacheNamespaceKey, { enabled?, ttlMs? }>>` | `{}` | Per-namespace overrides, keyed by access path (`'lol.match'`, …). A per-namespace `ttlMs` wins over the global one. |
+| `ttlMs`   | `number`     | per-namespace default  | **Blanket** positive TTL (ms) for every namespace, overriding their built-in defaults. Omit to keep each namespace's tuned default. |
+| `prefix`  | `string`     | `''`                   | Cache-key prefix prepended to every key, before any per-scope `prefix`. |
+| `negativeTtlMs` | `number` | per-namespace default | **Blanket** not-found (`404`) TTL (ms). `0` disables negative caching. See [Negative caching](#negative-caching-not-found). |
+| `namespaces` | `NamespacesCacheConfig` | `{}` | Nested per-scope overrides — a `product → service → method` tree of `CacheLevelOptions`. |
+
+Each scope accepts `CacheLevelOptions`:
+
+| Field     | Type      | Applies to                | Description |
+| --------- | --------- | ------------------------- | ----------- |
+| `enabled` | `boolean` | this scope + everything under it | Turn caching on/off here. Most specific wins (`{ summoner: { enabled: false, byPuuid: { enabled: true } } }` disables all summoner reads except `byPuuid`). |
+| `ttlMs`   | `number`  | positive (2xx) responses  | Overrides the namespace default / global `ttlMs`. |
+| `prefix`  | `string`  | the cache key             | **Composed** with the global + ancestor prefixes: `<global><product><service><method>URL`. |
+| `negativeTtlMs` | `number` | not-found (`404`) responses | `0` disables negative caching for this scope. |
 
 Shorthand mapping:
 
@@ -73,7 +96,7 @@ When the cache is on, each namespace uses its own default TTL, chosen for how fa
 | `lol.mastery` | 5 min | | `lol.challenges` | 10 min |
 | `lol.champion` | 1 h | | `lol.match` / `tft.match` | 1 h |
 
-The keys are the same paths you use to reach a namespace (`yasuo.lol.match` → `'lol.match'`), exported as the `CacheNamespace` enum / `CacheNamespaceKey` type. An unmapped request (should one arise) falls back to a 60s global default.
+Override them in `cache.namespaces` as a nested `product → service → method` tree (e.g. `{ lol: { match: { ttlMs } } }`) — keys autocomplete from the client. An unmapped request (should one arise) falls back to a 60s global default.
 
 ## Per-call overrides — `execute({ cache })`
 
@@ -106,14 +129,29 @@ The cache sits at the front of the request pipeline:
 1. yasuo resolves the endpoint into a full request URL.
 2. **Cache check** — if a fresh entry exists for that URL, it's returned immediately, before the rate limiter runs.
 3. On a miss, the request proceeds through the limiter and out to Riot.
-4. **On a successful (2xx) response only**, the result is stored under the URL for `ttlMs`.
+4. **On a successful (2xx) response**, the result is stored under the (prefixed) key for `ttlMs`. **On a `404`**, a *negative* entry is stored for `negativeTtlMs` (see below).
 
 A few consequences worth knowing:
 
-- **Keyed by the resolved URL.** Two calls that produce the same URL (same routing, path params and query) share a cache entry. Different query params are different keys.
-- **Only 2xx responses are cached.** Errors — `404`, `429`, `503` — are never stored, so a transient failure won't be served back to you until it expires.
+- **Keyed by the resolved URL, plus any prefix.** Two calls that produce the same URL (same routing, path params and query) share a cache entry. A configured `prefix` (global + per-scope, composed) is prepended to that key.
+- **2xx and `404` are cached; other errors are not.** A `404` is negative-cached (a repeated lookup of a non-existent resource costs no request); `429`/`503`/`5xx` are transient and never stored.
 - **Each entry stores `{ data, meta }`.** A hit reconstructs the exact same result, so the entity's own fields, `result.http.status`, `result.http.rateLimits` and friends are all present on a cached read, just as on a live one. (The `rateLimits` on a hit reflect the response that was cached, not a fresh measurement.)
 - **TTL is per entry.** Each write stamps its own expiry; there's no global flush timer.
+
+## Negative caching (not-found)
+
+When caching is on, a **`404`** (a Riot ID / summoner / match that doesn't exist) is
+stored as a *negative* entry. A repeat of the same lookup is served from the cache —
+it resolves to the same `NotFoundError` (`.error`, or a throw under `{ throw: true }`)
+**without a request**, so typos and probes for non-existent resources don't burn quota.
+
+- **On by default, per namespace.** `negativeTtlMs` defaults to the namespace's positive
+  TTL. Set it (globally, or per scope) to tune it, or to `0` to disable.
+- **Live-game excluded.** `lol.spectator` / `tft.spectator` default `negativeTtlMs` to
+  `0`: "not in a game" flips the moment a match starts, so their `404` is never cached.
+  Opt back in with `namespaces: { lol: { spectator: { negativeTtlMs: 30_000 } } }`.
+- **Positive wins.** A later successful response overwrites the negative entry.
+- **Only `404`.** Other failures (`429`, `503`, `5xx`) are transient and never negative-cached.
 
 ## `MemoryCache`
 
@@ -221,6 +259,8 @@ Any object implementing the `CacheStore` interface can back the client. Methods 
 export interface CachedResult {
   readonly data: unknown
   readonly meta: ResponseMeta
+  /** When `true`, a negative-cached not-found (`404`): `data` is null and a hit throws `NotFoundError`. */
+  readonly notFound?: boolean
 }
 
 export interface CacheStore {

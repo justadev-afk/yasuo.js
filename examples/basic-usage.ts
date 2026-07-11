@@ -236,13 +236,23 @@ async function staticData(): Promise<void> {
 // --- Per-namespace cache tuning ----------------------------------------------
 
 function withPerNamespaceCache(): Yasuo {
-  // Keep every namespace's tuned default TTL, but override a couple:
+  // Keep every namespace's tuned default TTL, but override per product / service /
+  // method (keys autocomplete from the client). `prefix` composes down the tree;
+  // more specific scopes win. Not-found (404) responses are negative-cached too.
   return new Yasuo({
     key: 'RGAPI-x',
     cache: {
+      prefix: 'yjs:',
       namespaces: {
-        'lol.match': { ttlMs: 86_400_000 }, // immutable — cache a full day
-        'lol.spectator': { enabled: false }, // never cache live games
+        lol: {
+          prefix: 'lol:',
+          match: { ttlMs: 86_400_000, prefix: 'm:' }, // immutable — cache a full day
+          summoner: { byPuuid: { ttlMs: 600_000 } }, // per-method override
+          spectator: { enabled: false }, // never cache live games
+        },
+        riot: {
+          account: { negativeTtlMs: 3_600_000 }, // cache "no such Riot ID" for an hour
+        },
       },
     },
   })

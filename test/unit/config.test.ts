@@ -8,11 +8,9 @@ import {
 } from '../../src/client/config'
 import { KVCache } from '../../src/core/cache/kv-cache'
 import { MemoryCache } from '../../src/core/cache/memory-cache'
-import { DEFAULT_NAMESPACE_TTL_MS } from '../../src/core/cache/namespace-defaults'
 import { RedisCache } from '../../src/core/cache/redis-cache'
 import { LogLevel, noopLogger } from '../../src/core/logger'
 import { DEFAULT_BASE_URL } from '../../src/endpoints/endpoint'
-import { CacheNamespace } from '../../src/enums/cache-namespace'
 
 describe('resolveRetryOptions', () => {
   test('applies defaults when omitted or true', () => {
@@ -62,10 +60,10 @@ describe('resolveCacheOptions', () => {
     expect(resolveCacheOptions(false).store).toBeNull()
   })
 
-  test('true yields an in-memory store with the default TTL', () => {
+  test('true yields an in-memory store and no global TTL override (namespace defaults apply)', () => {
     const resolved = resolveCacheOptions(true)
     expect(resolved.store).toBeInstanceOf(MemoryCache)
-    expect(resolved.ttlMs).toBe(60_000)
+    expect(resolved.ttlMs).toBeUndefined()
   })
 
   test('honours a custom store and TTL', () => {
@@ -100,50 +98,46 @@ describe('resolveCacheOptions', () => {
   })
 })
 
-describe('resolveCacheOptions namespaces', () => {
-  test('cache:true resolves each namespace to its built-in default TTL', () => {
+describe('resolveCacheOptions globals + namespace tree', () => {
+  test('cache:true → memory store, enabled, no global overrides', () => {
     const resolved = resolveCacheOptions(true)
+    expect(resolved.store).toBeInstanceOf(MemoryCache)
     expect(resolved.enabled).toBe(true)
-    expect(resolved.namespaces[CacheNamespace.LolMatch].ttlMs).toBe(
-      DEFAULT_NAMESPACE_TTL_MS[CacheNamespace.LolMatch],
-    )
-    expect(resolved.namespaces[CacheNamespace.LolSpectator].ttlMs).toBe(10_000)
-    expect(resolved.namespaces[CacheNamespace.RiotAccount].enabled).toBe(true)
+    expect(resolved.ttlMs).toBeUndefined()
+    expect(resolved.prefix).toBe('')
+    expect(resolved.negativeTtlMs).toBeUndefined()
+    expect(resolved.namespaces).toBeUndefined()
   })
 
-  test('off → store null and every namespace disabled', () => {
+  test('off → store null, disabled, empty globals', () => {
     const resolved = resolveCacheOptions(false)
     expect(resolved.store).toBeNull()
     expect(resolved.enabled).toBe(false)
-    expect(resolved.namespaces[CacheNamespace.LolSummoner].enabled).toBe(false)
+    expect(resolved.prefix).toBe('')
   })
 
-  test('a global ttlMs overrides all namespace defaults', () => {
-    const resolved = resolveCacheOptions({ ttlMs: 1000 })
-    expect(resolved.namespaces[CacheNamespace.LolMatch].ttlMs).toBe(1000)
-    expect(resolved.namespaces[CacheNamespace.LolSpectator].ttlMs).toBe(1000)
+  test('undefined → disabled', () => {
+    expect(resolveCacheOptions(undefined).enabled).toBe(false)
   })
 
-  test('a per-namespace override wins over the global ttlMs', () => {
+  test('keeps the global overrides + raw namespace tree verbatim', () => {
+    const namespaces = { lol: { match: { ttlMs: 5000 } } }
     const resolved = resolveCacheOptions({
       ttlMs: 1000,
-      namespaces: { 'lol.match': { ttlMs: 5000 } },
+      prefix: 'yjs:',
+      negativeTtlMs: 30_000,
+      namespaces,
     })
-    expect(resolved.namespaces[CacheNamespace.LolMatch].ttlMs).toBe(5000)
-    expect(resolved.namespaces[CacheNamespace.LolSummoner].ttlMs).toBe(1000)
+    expect(resolved.ttlMs).toBe(1000)
+    expect(resolved.prefix).toBe('yjs:')
+    expect(resolved.negativeTtlMs).toBe(30_000)
+    expect(resolved.namespaces).toBe(namespaces)
   })
 
-  test('per-namespace enabled:false disables only that namespace', () => {
-    const resolved = resolveCacheOptions({ namespaces: { 'lol.spectator': { enabled: false } } })
-    expect(resolved.namespaces[CacheNamespace.LolSpectator].enabled).toBe(false)
-    expect(resolved.namespaces[CacheNamespace.LolMatch].enabled).toBe(true)
-  })
-
-  test('enabled:false still builds the ttl table but disables everything', () => {
-    const resolved = resolveCacheOptions({ enabled: false, ttlMs: 2000 })
+  test('enabled:false → store null even with a store given', () => {
+    const resolved = resolveCacheOptions({ enabled: false, store: new MemoryCache() })
     expect(resolved.store).toBeNull()
-    expect(resolved.namespaces[CacheNamespace.LolMatch].enabled).toBe(false)
-    expect(resolved.namespaces[CacheNamespace.LolMatch].ttlMs).toBe(2000)
+    expect(resolved.enabled).toBe(false)
   })
 })
 

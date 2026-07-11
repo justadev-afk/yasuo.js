@@ -1,11 +1,15 @@
-import { type CacheStore, type CacheStoreLike, coerceCacheStore, MemoryCache } from '../core/cache'
-import { DEFAULT_NAMESPACE_TTL_MS } from '../core/cache/namespace-defaults'
+import {
+  type CacheStore,
+  type CacheStoreLike,
+  coerceCacheStore,
+  MemoryCache,
+  type NamespacesCacheConfig,
+} from '../core/cache'
 import type { HttpClient } from '../core/http/http-client'
 import type { HttpMiddleware } from '../core/http/middleware'
 import { createConsoleLogger, type Logger, type LogLevel, resolveLogLevel } from '../core/logger'
 import type { RateLimiterOptions } from '../core/rate-limit/rate-limiter'
 import { DEFAULT_BASE_URL } from '../endpoints/endpoint'
-import { CacheNamespace, type CacheNamespaceKey } from '../enums/cache-namespace'
 import { Game } from '../enums/game'
 
 /**
@@ -27,28 +31,16 @@ export interface RetryOptions {
 }
 
 /**
- * Per-namespace cache overrides, keyed under {@link CacheOptions.namespaces}.
- * Every field is optional and overrides the corresponding default for that one
- * namespace only.
- */
-export interface NamespaceCacheOptions {
-  /** Turn caching off for this namespace even when the cache is globally on. Default `true`. */
-  enabled?: boolean
-  /**
-   * TTL (ms) for this namespace's entries. Overrides both the namespace's
-   * built-in default and any global {@link CacheOptions.ttlMs}.
-   */
-  ttlMs?: number
-}
-
-/**
  * Response cache options. Caching is opt-in; when enabled, successful `GET`
  * responses are stored by URL and served without hitting Riot (or the rate
- * limiter) until they expire.
+ * limiter) until they expire. **Not-found (`404`) responses are negative-cached**
+ * too (except live-game namespaces) so a repeated lookup of a non-existent Riot ID
+ * costs no request — see {@link negativeTtlMs} and {@link CacheLevelOptions}.
  *
  * Each namespace has its own **built-in default TTL** tuned to how volatile its
- * data is (see {@link DEFAULT_NAMESPACE_TTL_MS}); override any of them via
- * {@link namespaces}, or set a blanket {@link ttlMs} for all of them.
+ * data is (see {@link DEFAULT_NAMESPACE_TTL_MS}). Override TTLs, prefixes and
+ * negative-cache windows at any depth — globally, per product, per service, or per
+ * method — via {@link namespaces}, or set a blanket {@link ttlMs}/{@link prefix}.
  */
 export interface CacheOptions {
   /** Whether caching is on. Default `true` when a {@link CacheOptions} object is given. */
@@ -60,26 +52,41 @@ export interface CacheOptions {
    */
   store?: CacheStoreLike
   /**
-   * Blanket TTL (ms) applied to **every** namespace, overriding their built-in
-   * per-namespace defaults. Omit to keep each namespace's tuned default. A
-   * per-namespace {@link NamespaceCacheOptions.ttlMs} still wins over this.
+   * Blanket positive TTL (ms) applied to **every** namespace, overriding their
+   * built-in per-namespace defaults. Omit to keep each namespace's tuned default.
+   * A per-scope {@link CacheLevelOptions.ttlMs} still wins over this.
    */
   ttlMs?: number
+  /** Cache-key prefix prepended to every key (before any per-scope prefix). */
+  prefix?: string
   /**
-   * Per-namespace overrides, keyed by the namespace's access path
-   * (`'lol.match'`, `'riot.account'`, …). Anything omitted keeps its default.
+   * Blanket not-found (`404`) TTL (ms) for every namespace. Omit to keep each
+   * namespace's default (its positive TTL, or `0` for live-game namespaces). `0`
+   * disables negative caching. A per-scope {@link CacheLevelOptions.negativeTtlMs}
+   * wins over this.
+   */
+  negativeTtlMs?: number
+  /**
+   * Nested, `keyof`-derived per-namespace overrides: a `product → service → method`
+   * tree, each level accepting {@link CacheLevelOptions} (`ttlMs`, `prefix`,
+   * `negativeTtlMs`, `enabled`). More specific scopes win; `prefix` composes down
+   * the tree. Keys autocomplete from the real client surface.
    *
    * @example
    * ```ts
    * cache: {
    *   namespaces: {
-   *     'lol.match': { ttlMs: 86_400_000 }, // immutable — cache a full day
-   *     'lol.spectator': { enabled: false }, // never cache live games
+   *     lol: {
+   *       prefix: 'lol:',
+   *       match: { ttlMs: 86_400_000, prefix: 'm:' }, // immutable — cache a day
+   *       summoner: { byPuuid: { ttlMs: 600_000 } },  // per-method override
+   *       spectator: { enabled: false },              // never cache live games
+   *     },
    *   },
    * }
    * ```
    */
-  namespaces?: Partial<Record<CacheNamespaceKey, NamespaceCacheOptions>>
+  namespaces?: NamespacesCacheConfig
 }
 
 /**
@@ -192,22 +199,27 @@ export interface ResolvedRetryOptions {
   readonly backoffBaseMs: number
 }
 
-/** Fully-resolved cache settings for a single namespace. */
-export interface ResolvedNamespaceCache {
-  readonly enabled: boolean
-  readonly ttlMs: number
-}
-
-/** Fully-resolved cache configuration. `store` is `null` when caching is off. */
+/**
+ * Fully-resolved cache configuration. `store` is `null` when caching is off. The
+ * per-request scope (product/service/method) is resolved lazily by the executor
+ * from {@link namespaces} via `resolveScopedCache`, so the raw tree is kept as-is.
+ */
 export interface ResolvedCacheOptions {
   readonly store: CacheStore | null
-  /** Global default TTL (ms), used as the fallback for an unmapped namespace. */
-  readonly ttlMs: number
   /** Whether the cache is globally enabled. */
   readonly enabled: boolean
-  /** Resolved `{ enabled, ttlMs }` for every {@link CacheNamespace}. */
-  readonly namespaces: Readonly<Record<CacheNamespace, ResolvedNamespaceCache>>
+  /** Global positive-TTL override (ms), or `undefined` to use per-namespace defaults. */
+  readonly ttlMs: number | undefined
+  /** Global cache-key prefix (prepended before any per-scope prefix). */
+  readonly prefix: string
+  /** Global not-found TTL override (ms), or `undefined` to use per-namespace defaults. */
+  readonly negativeTtlMs: number | undefined
+  /** The raw nested per-namespace override tree, resolved per request. */
+  readonly namespaces: NamespacesCacheConfig | undefined
 }
+
+/** Global default TTL (ms) for a request with no namespace scope (rare). */
+export const DEFAULT_CACHE_TTL_MS = 60_000
 
 const DEFAULT_RETRY: ResolvedRetryOptions = {
   enabled: true,
@@ -216,8 +228,6 @@ const DEFAULT_RETRY: ResolvedRetryOptions = {
   retryOnServiceUnavailable: true,
   backoffBaseMs: 1000,
 }
-
-const DEFAULT_CACHE_TTL_MS = 60_000
 
 /**
  * Normalise the user-facing {@link RetryOptions} (or a boolean shorthand) into
@@ -259,39 +269,44 @@ export function resolveRateLimiterOptions(rateLimit: YasuoConfig['rateLimit']): 
 }
 
 /**
- * Normalise the user-facing cache option into a {@link ResolvedCacheOptions},
- * resolving each namespace's `{ enabled, ttlMs }` from (in order of precedence)
- * a per-namespace override, a global `ttlMs`, then the namespace's built-in
- * default.
+ * Normalise the user-facing cache option into a {@link ResolvedCacheOptions}. The
+ * per-request scope (product/service/method) is resolved lazily by the executor
+ * via `resolveScopedCache`, so this just keeps the raw nested {@link CacheOptions.namespaces}
+ * tree plus the global defaults.
  */
 export function resolveCacheOptions(cache: YasuoConfig['cache']): ResolvedCacheOptions {
   if (cache === undefined || cache === false) {
-    return buildResolvedCache(null, false, undefined, undefined)
+    return DISABLED_CACHE
   }
   if (cache === true) {
-    return buildResolvedCache(new MemoryCache(), true, undefined, undefined)
+    return {
+      store: new MemoryCache(),
+      enabled: true,
+      ttlMs: undefined,
+      prefix: '',
+      negativeTtlMs: undefined,
+      namespaces: undefined,
+    }
   }
   const enabled = cache.enabled !== false
   const store = enabled ? (cache.store ? coerceCacheStore(cache.store) : new MemoryCache()) : null
-  return buildResolvedCache(store, enabled, cache.ttlMs, cache.namespaces)
+  return {
+    store,
+    enabled,
+    ttlMs: cache.ttlMs,
+    prefix: cache.prefix ?? '',
+    negativeTtlMs: cache.negativeTtlMs,
+    namespaces: cache.namespaces,
+  }
 }
 
-/** Assemble the per-namespace resolved cache table from the normalised inputs. */
-function buildResolvedCache(
-  store: CacheStore | null,
-  enabled: boolean,
-  globalTtlMs: number | undefined,
-  overrides: Partial<Record<CacheNamespaceKey, NamespaceCacheOptions>> | undefined,
-): ResolvedCacheOptions {
-  const namespaces = {} as Record<CacheNamespace, ResolvedNamespaceCache>
-  for (const ns of Object.values(CacheNamespace)) {
-    const override = overrides?.[ns]
-    namespaces[ns] = {
-      enabled: enabled && (override?.enabled ?? true),
-      ttlMs: override?.ttlMs ?? globalTtlMs ?? DEFAULT_NAMESPACE_TTL_MS[ns],
-    }
-  }
-  return { store, enabled, ttlMs: globalTtlMs ?? DEFAULT_CACHE_TTL_MS, namespaces }
+const DISABLED_CACHE: ResolvedCacheOptions = {
+  store: null,
+  enabled: false,
+  ttlMs: undefined,
+  prefix: '',
+  negativeTtlMs: undefined,
+  namespaces: undefined,
 }
 
 /** Resolve the logger to use, honouring an explicit logger or the log level. */
