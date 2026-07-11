@@ -38,6 +38,16 @@ These are Riot's **development-key defaults**. The moment a real response arrive
 
 By default the limiter reconciles its local counters with Riot's `-count` headers (`syncWithHeaders: true`). When a response reports, say, `x-app-rate-limit-count: 7:1`, the window is **topped up** to at least 7 in-flight timestamps even if yasuo only recorded fewer locally. This protects you when the key is **shared** with another process (or another machine): you never believe you have more budget than Riot says you do. Set `syncWithHeaders: false` to ignore the counts and track only requests this client made.
 
+### Knowing when you're brushing the limit (WARN log)
+
+Proactive pacing is silent by design — it just *delays* a request rather than failing it — but you usually want to know **how often** you're hitting the ceiling. So whenever the limiter has to park a request (a bucket was momentarily full and `acquire` had to wait before sending), it emits a single **`WARN`** through the client's configured logger:
+
+```
+[yasuo] rate limit reached: self-throttled for 320ms before sending (method americas:match.byPuuid)
+```
+
+The message names the **method bucket** and the **total time waited**, so a spike of these lines is your signal to spread the load out, raise `concurrency` pressure elsewhere, or request a higher key. It flows through the same logger/level as everything else — see [logging.md](logging.md) — so it's off until you set a level of `warn` or lower (`logLevel: LogLevel.WARN`, or `LOG_LEVEL=warn`). This is distinct from the reactive path below: a self-throttle WARN means yasuo kept you *under* the limit, whereas a `429` that slips through is logged separately on retry.
+
 ## Reactive: honour `retry-after`
 
 Proactive pacing cannot cover every case — a key shared across processes, a service blip, or a `503`. So when a `429` or `503` does come back:
@@ -67,6 +77,7 @@ const yasuo = new Yasuo({
 | `bootstrapAppWindows` | `RateLimitWindow[]` | `20/1s` + `100/120s` | Windows an app bucket uses before real limits are learned. |
 | `syncWithHeaders` | `boolean` | `true` | Reconcile local counters with Riot's `*-count` headers. |
 | `clock` | `Clock` | system clock | Injectable time source, primarily for deterministic tests. |
+| `logger` | `Logger` | no-op | Logger the limiter emits its self-throttle **WARN** through (see below). The `Yasuo` client wires its own configured logger in automatically; you only set this when constructing a `RateLimiter` standalone. |
 
 `rateLimit: true` is shorthand for `{ enabled: true }`; `rateLimit: false` **or omitting it** is `{ enabled: false }` — proactive pacing stays off until you ask for it. Reactive retries are unaffected either way.
 

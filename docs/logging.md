@@ -10,7 +10,7 @@ yasuo ships a small **leveled logger**. It is **silent by default** — the clie
 | --- | --- | --- |
 | `LogLevel.DEBUG` | `10` | everything: every request URL, cache hits, plus all higher levels |
 | `LogLevel.INFO` | `20` | informational messages, plus warnings and errors |
-| `LogLevel.WARN` | `30` | reactive retries, plus errors |
+| `LogLevel.WARN` | `30` | rate-limit self-throttles + reactive retries, plus errors |
 | `LogLevel.ERROR` | `40` | final request failures only |
 | `LogLevel.SILENT` | `100` | nothing — **the default** |
 
@@ -73,6 +73,7 @@ Every network call flows through the request pipeline, which logs at these level
 | --- | --- | --- |
 | `debug` | `cache hit <url>` | a fresh cache entry is served (no network) |
 | `debug` | `GET <url>` | each outgoing request, just before it is sent |
+| `warn` | `rate limit reached: self-throttled for <ms>ms before sending (method <key>)` | proactive pacing parked a request under Riot's limits (a bucket was momentarily full) — see [rate-limiting.md](rate-limiting.md) |
 | `warn` | `retry <n>/<max> after <ms>ms (status <code>) <url>` | a `429`/`5xx` triggers a reactive retry |
 | `error` | `request failed (<status>) <url>` | retries are exhausted and the request finally fails — the `ApiError` surfaces as the result's `.error` (or is thrown when you call `.execute({ throw: true })`) |
 

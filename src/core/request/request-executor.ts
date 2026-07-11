@@ -100,11 +100,16 @@ export class RequestExecutor {
     this.keys = resolveApiKeys(config)
     this.keyFingerprints = buildKeyFingerprints(this.keys)
     this.baseUrl = resolveBaseUrl(config.baseUrl)
-    this.rateLimiter = new RateLimiter(resolveRateLimiterOptions(config.rateLimit))
+    // Resolve the logger before the limiter so the limiter can emit its
+    // self-throttle WARN through the same configured logger.
+    this.logger = resolveLogger(config)
+    this.rateLimiter = new RateLimiter({
+      ...resolveRateLimiterOptions(config.rateLimit),
+      logger: this.logger,
+    })
     this.retry = resolveRetryOptions(config.retry)
     this.semaphore = new Semaphore(config.concurrency ?? Number.POSITIVE_INFINITY)
     this.httpClient = config.httpClient ?? new FetchHttpClient()
-    this.logger = resolveLogger(config)
     this.middleware = [...(config.middleware ?? [])]
     this.cacheOptions = resolveCacheOptions(config.cache)
     this.cache = this.cacheOptions.store

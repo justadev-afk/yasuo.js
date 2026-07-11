@@ -1,5 +1,6 @@
 import type { RateLimits, RateLimitWindow } from '../../dto/common.dto'
 import { RateLimitType } from '../../enums/rate-limit'
+import { type Logger, noopLogger } from '../logger'
 import { type Clock, sleep, systemClock } from '../util'
 import { RateLimitBucket } from './rate-limit-bucket'
 
@@ -25,6 +26,11 @@ export interface RateLimiterOptions {
   bootstrapAppWindows?: readonly RateLimitWindow[]
   /** Reconcile local counters with Riot's `*-count` headers (default `true`). */
   syncWithHeaders?: boolean
+  /**
+   * Logger used to emit a WARN when the limiter self-throttles (waits). Defaults
+   * to a no-op.
+   */
+  logger?: Logger
 }
 
 const NOOP = (): void => {}
@@ -48,6 +54,7 @@ export class RateLimiter {
   private readonly clock: Clock
   private readonly enabled: boolean
   private gate: Promise<void> = Promise.resolve()
+  private readonly logger: Logger
   private readonly methodBuckets = new Map<string, RateLimitBucket>()
   private readonly syncWithHeaders: boolean
 
@@ -56,6 +63,7 @@ export class RateLimiter {
     this.clock = options.clock ?? systemClock
     this.bootstrapAppWindows = options.bootstrapAppWindows ?? DEFAULT_BOOTSTRAP_APP_WINDOWS
     this.syncWithHeaders = options.syncWithHeaders ?? true
+    this.logger = options.logger ?? noopLogger
   }
 
   /**
@@ -69,11 +77,20 @@ export class RateLimiter {
     if (!this.enabled) {
       return
     }
+    let waited = 0
     for (;;) {
       const wait = await this.reserve(appKey, methodKey)
       if (wait <= 0) {
+        // The proactive limiter parked this request under Riot's advertised
+        // limits — surface it at WARN so brushing the limit is trackable.
+        if (waited > 0) {
+          this.logger.warn(
+            `rate limit reached: self-throttled for ${waited}ms before sending (method ${methodKey})`,
+          )
+        }
         return
       }
+      waited += wait
       await sleep(wait)
     }
   }

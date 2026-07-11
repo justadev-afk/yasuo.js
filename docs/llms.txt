@@ -447,6 +447,9 @@ both on two fronts:
 - **Proactive (opt-in, `rateLimit: true`).** Sliding-window pacing under the
   advertised limits (per-host app bucket + per-endpoint method bucket), learned from
   response headers. Bootstrap defaults to Riot dev-key limits (20/s, 100/2min).
+  Each time it parks a request (self-throttles), it emits ONE `WARN` via the
+  configured logger — `rate limit reached: self-throttled for <ms>ms before sending
+  (method <key>)` — so brushing the limit is trackable (needs `logLevel` ≤ `WARN`).
 
 ```ts
 new Yasuo({ key })                              // reactive retries only (default)
@@ -454,7 +457,7 @@ new Yasuo({ key, rateLimit: true })             // + proactive pacing
 new Yasuo({ key, retry: { maxAttempts: 5, backoffBaseMs: 250, retryOnServiceUnavailable: false } })
 ```
 
-`RateLimiterOptions`: `{ enabled?, bootstrapAppWindows?, syncWithHeaders?=true, clock? }`.
+`RateLimiterOptions`: `{ enabled?, bootstrapAppWindows?, syncWithHeaders?=true, clock?, logger? }` (`logger` receives the self-throttle WARN; the `Yasuo` client wires its own in).
 `RetryOptions`: `{ enabled?=true, maxAttempts?=3, maxRetryAfterSeconds?=120, retryOnServiceUnavailable?=true, backoffBaseMs?=1000 }`.
 Inspect budget at runtime via `result.http.rateLimits` (`.app`, `.method`,
 `.retryAfterSeconds`, `.type`, `.edgeTraceId`). `concurrency` caps in-flight
@@ -534,8 +537,9 @@ ERROR(40) < SILENT(100)`. A logger emits at or above its level.
 Configure (precedence high→low): explicit `logger` (4 methods `debug/info/warn/error`,
 each `(message, ...args) => void`; wins outright) > `logLevel` in config >
 `YASUO_LOG_LEVEL` env > `LOG_LEVEL` env > `SILENT`. Built-in console logger prefixes
-`[yasuo]`. What's logged: `debug` = `cache hit`/`GET <url>`; `warn` = reactive retry;
-`error` = final failure. `info` is unused internally (available to custom loggers).
+`[yasuo]`. What's logged: `debug` = `cache hit`/`GET <url>`; `warn` = rate-limit
+self-throttle + reactive retry; `error` = final failure. `info` is unused internally
+(available to custom loggers).
 
 ---
 
