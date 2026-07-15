@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # Dev dependencies (Biome, tsup, TypeScript, @types).
+  # Dev dependencies (Biome, tsdown, TypeScript, @types).
   - package-ecosystem: npm
     directory: "/"
     schedule:
@@ -13,7 +13,6 @@ updates:
     groups:
       dev-dependencies:
         dependency-type: development
-
   # GitHub Actions used by the CI and docs workflows.
   - package-ecosystem: github-actions
     directory: "/"

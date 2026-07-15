@@ -4,7 +4,7 @@ This document is the source of truth for **how yasuo is organised and why**. It 
 
 ## Guiding principles
 
-1. **Zero runtime dependencies.** Nothing in `dependencies`, ever. If you need a utility, write a small one under `core/util`. Dev dependencies (Biome, tsup, TypeScript, `@types/bun`) are fine.
+1. **Zero runtime dependencies.** Nothing in `dependencies`, ever. If you need a utility, write a small one under `core/util`. Dev dependencies (Biome, tsdown, TypeScript, `@types/bun`) are fine.
 2. **No magic strings or numbers.** Every value that Riot defines — regions, queues, tiers, HTTP headers, statuses, hosts — is an `enum` under `src/enums`. Reference the enum, never a literal.
 3. **One declaration per file.** A file exports at most **one class**, or a small set of closely-related **functions**, or a cohesive group of **types**. Splitting keeps files small, diffs focused, and tree-shaking effective.
 4. **DTOs mirror the wire; entities are the ergonomics.** Raw payload shapes live in `src/dto` and match Riot's JSON exactly (including snake_case where Riot uses it). Everything the *user* touches is an entity that wraps a DTO and adds relations + metadata.
@@ -143,8 +143,12 @@ The transport is **pluggable**. `request()` sends through an injected `HttpClien
 
 - **Package manager & runtime:** Bun.
 - **Lint & format:** Biome (`bun run lint`, `bun run format`). Config in `biome.json`.
-- **Types:** `tsc --noEmit` in strict mode (`bun run typecheck`). Must stay green.
-- **Build:** tsup → a single ESM + CJS file with `.d.ts` (`bun run build`). `splitting: false` guarantees one file each.
+- **Types:** TypeScript **7** — one TypeScript in the tree, no side-by-side installs. `tsc --noEmit` in strict mode (`bun run typecheck`). Must stay green.
+- **Build:** tsdown (rolldown) → a single ESM + CJS file with `.d.ts` (`bun run build`). Config in `tsdown.config.ts`.
+- **Why tsdown and not tsup.** TypeScript 7 is the native (Go) compiler and deliberately ships **no stable JS compiler API** ([announcement](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/): *"it does not ship with an API. We expect TypeScript 7.1 to ship with a new (and different) API"*). Its root export is just `lib/version.cjs`, so `require('typescript')` yields only `getExePath`/`version` — `ts.sys` and `ts.createProgram` are gone. (An **unstable** API exists under `typescript/unstable/*`, but it's a new shape, not a drop-in.) tsup's `dts: true` rolls declarations up with `rollup-plugin-dts`, which reads `ts.sys.useCaseSensitiveFileNames` at module scope and dies with `Cannot read properties of undefined`. Its peers are `^4.5 || ^5.0 || ^6.0` — no `^7` — and tsup **vendors** it into `dist/rollup.js`, so no override can fix it ([rollup-plugin-dts#395](https://github.com/Swatinem/rollup-plugin-dts/issues/395), [tsup#1405](https://github.com/egoist/tsup/issues/1405) — both open). tsdown's dts generator drives the TS7 binary directly (`tsgo`), needing neither the JS API nor `isolatedDeclarations`, so the endpoints' `as const satisfies` idiom is untouched.
+- **`tsgo` dts is upstream-flagged experimental.** The build prints `TypeScript 7.0 does not yet have a stable API and is experimental` on every run — that warning is expected, not a regression. Don't set `failOnWarn` ([tsdown#1013](https://github.com/rolldown/tsdown/issues/1013)). Because the emitted `.d.ts` **is** the public API, treat it as an artefact to verify, not to trust: it is checked from a TS5 consumer with `skipLibCheck` **off** (the `peerDependencies` floor), asserting JSDoc and the entity declaration-merging pattern survive the rollup. Re-run that check when tsdown or TypeScript moves.
+- **Scripts run through Bun (`bunx --bun …`), not Node.** TS7's `tsc` and tsdown's CLI are ESM and need a modern Node; forcing the Bun runtime keeps `typecheck`/`build` working regardless of the local Node version.
+- **`outExtensions` pins the emitted filenames.** tsdown defaults to `index.mjs`/`index.d.mts`; `tsdown.config.ts` maps ESM→`.js`/`.d.ts` and CJS→`.cjs`/`.d.cts` so `package.json#exports` — and every published consumer — sees no change. The duplicate `index.d.cts` is still deleted by the `build` script (~36 kB gzipped, ~35% of the tarball, with zero type loss).
 - **Tests:** `bun test`. Unit tests under `test/unit` (no network, deterministic — inject a mock `HttpClient`); live tests under `test/integration` (skipped without `RIOT_API_KEY`).
 - **Coverage gate:** the `test`/`test:unit` scripts run with `--coverage`, and `bunfig.toml` fails the run below **95% line/statement coverage** (currently ~97.5%). New logic ships with a unit test.
 
