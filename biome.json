@@ -65,7 +65,8 @@
         "useNamingConvention": "off",
         "useDefaultParameterLast": "error",
         "useCollapsedElseIf": "error",
-        "useConsistentMemberAccessibility": "off"
+        "useConsistentMemberAccessibility": "off",
+        "noNestedTernary": "error"
       },
       "suspicious": {
         "noExplicitAny": "error",

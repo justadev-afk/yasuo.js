@@ -289,7 +289,15 @@ export function resolveCacheOptions(cache: YasuoConfig['cache']): ResolvedCacheO
     }
   }
   const enabled = cache.enabled !== false
-  const store = enabled ? (cache.store ? coerceCacheStore(cache.store) : new MemoryCache()) : null
+  // Disabled → no store at all; otherwise the caller's store, or the in-memory default.
+  // Early returns rather than a chained ternary (see the root CLAUDE.md), and this way
+  // `new MemoryCache()` is only constructed on the branch that actually keeps it.
+  const resolveStore = (): CacheStore | null => {
+    if (!enabled) return null
+    if (cache.store) return coerceCacheStore(cache.store)
+    return new MemoryCache()
+  }
+  const store = resolveStore()
   return {
     store,
     enabled,
