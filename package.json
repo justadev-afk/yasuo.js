@@ -73,7 +73,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.2",
     "@types/bun": "latest",
-    "tsdown": "^0.22.8",
+    "tsdown": "^0.23.0",
     "typescript": "^7.0.2"
   },
   "peerDependencies": {
